@@ -1,4 +1,4 @@
-package com.agent.voice_agent.validation;
+package com.agent.voice_agent.component;
 
 import com.agent.voice_agent.config.AudioProperties;
 import org.springframework.stereotype.Component;
@@ -25,7 +25,7 @@ public class AudioFileValidator {
 
     private void validateSize(MultipartFile file) {
 
-        if (file.getSize() > audioProperties.maxFileSize().toString().getBytes().length) {
+        if (file.getSize() > audioProperties.maxFileSize().toBytes()) {
             throw new IllegalArgumentException(
                     "Audio file exceeds the maximum allowed size of "
                             + audioProperties.maxFileSize()

@@ -2,7 +2,7 @@ package com.agent.voice_agent.controller;
 
 import com.agent.voice_agent.dto.TranscriptionResponse;
 import com.agent.voice_agent.service.DeepgramService;
-import com.agent.voice_agent.validation.AudioFileValidator;
+import com.agent.voice_agent.component.AudioFileValidator;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
