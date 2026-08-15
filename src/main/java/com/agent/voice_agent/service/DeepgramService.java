@@ -1,30 +1,24 @@
 package com.agent.voice_agent.service;
 
-import com.agent.voice_agent.Config.DeepgramConfig;
+import com.agent.voice_agent.config.DeepgramProperties;
 import com.agent.voice_agent.dto.DeepgramResponse;
 import com.agent.voice_agent.dto.TranscriptionResponse;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
+import org.springframework.web.client.RestClient;
 
 @Service
 public class DeepgramService {
 
-    private static final String DEEPGRAM_URL =
-            "https://api.deepgram.com/v1/listen"
-                    + "?model=nova-3"
-                    + "&smart_format=true";
+    private final RestClient deepgramRestClient;
+    private final DeepgramProperties properties;
 
-    private final DeepgramConfig deepgramConfig;
-    private final RestTemplate restTemplate;
-
-    public DeepgramService(DeepgramConfig deepgramConfig) {
-        this.deepgramConfig = deepgramConfig;
-        this.restTemplate = new RestTemplate();
+    public DeepgramService(
+            RestClient deepgramRestClient,
+            DeepgramProperties properties
+    ) {
+        this.deepgramRestClient = deepgramRestClient;
+        this.properties = properties;
     }
 
     public TranscriptionResponse transcribe(
@@ -32,29 +26,21 @@ public class DeepgramService {
             String contentType
     ) {
 
-        HttpHeaders headers = new HttpHeaders();
+        DeepgramResponse response = deepgramRestClient.post()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/v1/listen")
+                        .queryParam("model", properties.model())
+                        .queryParam(
+                                "smart_format",
+                                properties.smartFormat()
+                        )
+                        .build())
+                .contentType(MediaType.parseMediaType(contentType))
+                .body(audioBytes)
+                .retrieve()
+                .body(DeepgramResponse.class);
 
-        headers.set(
-                "Authorization",
-                "Token " + deepgramConfig.getApiKey()
-        );
-
-        headers.setContentType(
-                MediaType.parseMediaType(contentType)
-        );
-
-        HttpEntity<byte[]> request =
-                new HttpEntity<>(audioBytes, headers);
-
-        ResponseEntity<DeepgramResponse> response =
-                restTemplate.exchange(
-                        DEEPGRAM_URL,
-                        HttpMethod.POST,
-                        request,
-                        DeepgramResponse.class
-                );
-
-        String transcript = extractTranscript(response.getBody());
+        String transcript = extractTranscript(response);
 
         return new TranscriptionResponse(transcript);
     }

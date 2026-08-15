@@ -7,9 +7,13 @@ server:
 
 deepgram:
   api-key: de0ea318988a5fdfa7fbd9dd380cdea88ff9730f
+  base-url: https://api.deepgram.com
+  model: nova-3
+  smart-format: true
 
 servlet:
   multipart:
     enabled: true
     max-file-size: 20MB
     max-request-size: 20MB
+

@@ -3,7 +3,7 @@ package com.agent.voice_agent.controller;
 
 import com.agent.voice_agent.dto.TranscriptionResponse;
 import com.agent.voice_agent.service.DeepgramService;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.agent.voice_agent.validation.AudioFileValidator;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -21,8 +21,10 @@ public class speech_to_text {
 
     private final DeepgramService deepgramService;
 
-    public speech_to_text(DeepgramService deepgramService) {
+    public speech_to_text(DeepgramService deepgramService,AudioFileValidator audioFileValidator) {
         this.deepgramService = deepgramService;
+        this.audioFileValidator = audioFileValidator;
+
     }
 
     @PostMapping(
@@ -33,9 +35,8 @@ public class speech_to_text {
             @RequestParam("file") MultipartFile file
     ) throws IOException {
 
-        if (file.isEmpty()) {
-            return ResponseEntity.badRequest().build();
-        }
+        audioFileValidator.validate(file);
+        
 
         TranscriptionResponse response =
                 deepgramService.transcribe(
