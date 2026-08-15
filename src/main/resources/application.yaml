@@ -1,0 +1,15 @@
+spring:
+  application:
+    name: voice-agent
+
+server:
+  port: 8080
+
+deepgram:
+  api-key: de0ea318988a5fdfa7fbd9dd380cdea88ff9730f
+
+servlet:
+  multipart:
+    enabled: true
+    max-file-size: 20MB
+    max-request-size: 20MB
