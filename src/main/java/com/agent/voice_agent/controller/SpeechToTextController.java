@@ -1,30 +1,28 @@
 package com.agent.voice_agent.controller;
 
-
 import com.agent.voice_agent.dto.TranscriptionResponse;
 import com.agent.voice_agent.service.DeepgramService;
 import com.agent.voice_agent.validation.AudioFileValidator;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 
 @RestController
 @RequestMapping("/api/speech-to-text")
-public class speech_to_text {
-
+public class SpeechToTextController {
 
     private final DeepgramService deepgramService;
+    private final AudioFileValidator audioFileValidator;
 
-    public speech_to_text(DeepgramService deepgramService,AudioFileValidator audioFileValidator) {
+    public SpeechToTextController(
+            DeepgramService deepgramService,
+            AudioFileValidator audioFileValidator
+    ) {
         this.deepgramService = deepgramService;
         this.audioFileValidator = audioFileValidator;
-
     }
 
     @PostMapping(
@@ -36,7 +34,6 @@ public class speech_to_text {
     ) throws IOException {
 
         audioFileValidator.validate(file);
-        
 
         TranscriptionResponse response =
                 deepgramService.transcribe(
@@ -47,4 +44,3 @@ public class speech_to_text {
         return ResponseEntity.ok(response);
     }
 }
-

@@ -11,9 +11,14 @@ deepgram:
   model: nova-3
   smart-format: true
 
-servlet:
-  multipart:
-    enabled: true
-    max-file-size: 20MB
-    max-request-size: 20MB
-
+audio:
+  max-file-size: 15MB
+  allowed-content-types:
+    - audio/wav
+    - audio/x-wav
+    - audio/mpeg
+    - audio/mp3
+    - audio/webm
+    - audio/ogg
+    - audio/mp4
+    - audio/m4a
