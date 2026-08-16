@@ -1,13 +1,10 @@
 package com.agent.voice_agent.service;
 
 import com.agent.voice_agent.dto.DocumentChunk;
-import com.agent.voice_agent.dto.DocumentIngestionResponse;
 import com.agent.voice_agent.dto.EmbeddedChunk;
+import com.agent.voice_agent.vector.VectorStore;
 import org.springframework.stereotype.Service;
-import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 @Service
@@ -15,34 +12,23 @@ public class DocumentIngestionService {
 
     private final ChunkingService chunkingService;
     private final OllamaEmbeddingService embeddingService;
+    private final VectorStore vectorStore;
 
     public DocumentIngestionService(
             ChunkingService chunkingService,
-            OllamaEmbeddingService embeddingService
+            OllamaEmbeddingService embeddingService,
+            VectorStore vectorStore
     ) {
         this.chunkingService = chunkingService;
         this.embeddingService = embeddingService;
+        this.vectorStore = vectorStore;
     }
 
-    public DocumentIngestionResponse ingest(
-            MultipartFile file
-    ) throws IOException {
+    public List<EmbeddedChunk> ingest(String documentText) {
 
-        if (file == null || file.isEmpty()) {
+        if (documentText == null || documentText.isBlank()) {
             throw new IllegalArgumentException(
-                    "Document file cannot be empty"
-            );
-        }
-
-        String documentText =
-                new String(
-                        file.getBytes(),
-                        StandardCharsets.UTF_8
-                );
-
-        if (documentText.isBlank()) {
-            throw new IllegalArgumentException(
-                    "Document does not contain any text"
+                    "Document text cannot be null or blank"
             );
         }
 
@@ -54,11 +40,12 @@ public class DocumentIngestionService {
                         .map(this::createEmbeddedChunk)
                         .toList();
 
-        return new DocumentIngestionResponse(
-                file.getOriginalFilename(),
-                embeddedChunks.size(),
-                embeddedChunks
-        );
+        /*
+         * Store the generated embeddings in HNSW.
+         */
+        vectorStore.addAll(embeddedChunks);
+
+        return embeddedChunks;
     }
 
     private EmbeddedChunk createEmbeddedChunk(
