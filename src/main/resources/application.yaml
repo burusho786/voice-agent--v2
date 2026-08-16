@@ -28,3 +28,6 @@ audio:
 ollama:
   base-url: http://localhost:11434
   model: gemma3:4b
+  embedding:
+    base-url: http://localhost:11434
+    model: nomic-embed-text
