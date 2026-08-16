@@ -11,12 +11,6 @@ deepgram:
   model: nova-3
   smart-format: true
 
-servlet:
-  multipart:
-    enabled: true
-    max-file-size: 20MB
-    max-request-size: 20MB
-
 audio:
   max-file-size: 15MB
   allowed-content-types:
@@ -28,3 +22,7 @@ audio:
     - audio/ogg
     - audio/mp4
     - audio/m4a
+
+ollama:
+  base-url: http://localhost:11434
+  model: gemma3:4b
