@@ -6,7 +6,8 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.web.client.RestClient;
 
 @Configuration
-@EnableConfigurationProperties({DeepgramProperties.class})
+@EnableConfigurationProperties({DeepgramProperties.class,DeepgramTtsProperties.class})
+
 public class DeepgramClientConfig {
 
     @Bean

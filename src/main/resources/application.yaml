@@ -10,6 +10,8 @@ deepgram:
   base-url: https://api.deepgram.com
   model: nova-3
   smart-format: true
+  tts:
+    model: aura-2-thalia-en
 
 audio:
   max-file-size: 15MB
