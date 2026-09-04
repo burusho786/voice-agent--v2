@@ -43,6 +43,12 @@ public class VoiceAgentService {
 
         long totalStart = System.currentTimeMillis();
 
+        log.info(
+                "VOICE PIPELINE STARTED | Audio size: {} bytes | Content-Type: {}",
+                audioBytes.length,
+                contentType
+        );
+
         /*
          * ============================================================
          * STEP 1
@@ -89,7 +95,7 @@ public class VoiceAgentService {
         List<VectorSearchResult> results =
                 ragRetrievalService.retrieve(
                         transcript,
-                        3
+                        1
                 );
 
         long ragTime =
@@ -121,6 +127,11 @@ public class VoiceAgentService {
                         results
                 );
 
+        log.info(
+                "RAG prompt built successfully | Context chunks: {}",
+                results.size()
+        );
+
 
         /*
          * ============================================================
@@ -151,8 +162,9 @@ public class VoiceAgentService {
         }
 
         log.info(
-                "LLM completed in {} ms",
-                llmTime
+                "LLM completed in {} ms | Response length: {} characters",
+                llmTime,
+                responseText.length()
         );
 
 
@@ -173,6 +185,12 @@ public class VoiceAgentService {
         long ttsTime =
                 System.currentTimeMillis() - ttsStart;
 
+        log.info(
+                "TTS completed in {} ms | Audio size: {} bytes",
+                ttsTime,
+                audioResponse.length
+        );
+
 
         /*
          * ============================================================
@@ -184,13 +202,7 @@ public class VoiceAgentService {
                 System.currentTimeMillis() - totalStart;
 
         log.info(
-                "TTS completed in {} ms | Audio size: {} bytes",
-                ttsTime,
-                audioResponse.length
-        );
-
-        log.info(
-                "VOICE PIPELINE | " +
+                "VOICE PIPELINE COMPLETED | " +
                         "STT: {} ms | " +
                         "RAG: {} ms | " +
                         "LLM: {} ms | " +
