@@ -2,6 +2,14 @@ spring:
   application:
     name: voice-agent
 
+  data:
+    mongodb:
+      uri: mongodb+srv://burusho786_db_user:UhoGZ7CpuNEJ0hDj@cluster0.vdq7upj.mongodb.net/admin?voice-agent=Cluster0
+      auto-index-creation: true
+
+  jwt:
+    secret: TaK+HaV^uvCHEFsEVfypW#7g9^k*Z8$V
+
 server:
   port: 8080
 
@@ -31,3 +39,4 @@ ollama:
   embedding:
     base-url: http://localhost:11434
     model: nomic-embed-text
+
