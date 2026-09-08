@@ -1,750 +1,330 @@
-const authSection = document.getElementById("authSection");
-
-const registerSection = document.getElementById("registerSection");
-const loginSection = document.getElementById("loginSection");
-
-const registerEmail = document.getElementById("registerEmail");
-const registerPassword = document.getElementById("registerPassword");
-const registerButton = document.getElementById("registerButton");
-const registerStatus = document.getElementById("registerStatus");
-
-const loginEmail = document.getElementById("loginEmail");
-const loginPassword = document.getElementById("loginPassword");
-const loginButton = document.getElementById("loginButton");
-const loginStatus = document.getElementById("loginStatus");
-
-const showLoginButton = document.getElementById("showLoginButton");
-const showRegisterButton = document.getElementById("showRegisterButton");
-
-const agentSection = document.getElementById("agentSection");
-const logoutButton = document.getElementById("logoutButton");
-
-const audioInput = document.getElementById("audioInput");
-const sendButton = document.getElementById("sendButton");
-
-const chatMessages = document.getElementById("chatMessages");
-const status = document.getElementById("status");
-
-
-console.log("Voice Agent app.js loaded");
-
-
-/*
- * Initial application state
+/**
+ * Voice Agent — Authentication Logic
+ *
+ * Handles:
+ * - Login form submission
+ * - Registration form submission
+ * - Toggle between login and register views
+ * - JWT token storage in localStorage
+ * - Error and success message display
+ *
+ * API Contract:
+ * - POST /api/auth/login → { accessToken, tokenType, expiresIn }
+ * - POST /api/auth/register → registration response
  */
 
-const existingToken = localStorage.getItem("accessToken");
+(function () {
+    'use strict';
 
-if (existingToken) {
+    // ------------------------------------------------------------------
+    // DOM Element References
+    // ------------------------------------------------------------------
 
-    console.log("Existing access token found.");
+    const loginForm = document.getElementById('loginForm');
+    const registerForm = document.getElementById('registerForm');
+    const toggleLink = document.getElementById('toggleLink');
+    const toggleText = document.getElementById('toggleText');
+    const errorMessage = document.getElementById('errorMessage');
+    const successMessage = document.getElementById('successMessage');
 
-    showAgentSection();
+    const loginEmail = document.getElementById('loginEmail');
+    const loginPassword = document.getElementById('loginPassword');
 
-} else {
+    const registerName = document.getElementById('registerName');
+    const registerEmail = document.getElementById('registerEmail');
+    const registerPassword = document.getElementById('registerPassword');
 
-    console.log("No access token found.");
+    // ------------------------------------------------------------------
+    // Configuration
+    // ------------------------------------------------------------------
 
-    showRegisterSection();
-}
+    const API_BASE_URL = window.location.origin;
+    const JWT_STORAGE_KEY = 'jwt_token';
+    const TOKEN_TYPE_STORAGE_KEY = 'jwt_token_type';
 
+    // ------------------------------------------------------------------
+    // Utility Functions
+    // ------------------------------------------------------------------
 
-/*
- * Switch to Login
- */
-
-showLoginButton.addEventListener("click", () => {
-
-    showLoginSection();
-
-});
-
-
-/*
- * Switch to Registration
- */
-
-showRegisterButton.addEventListener("click", () => {
-
-    showRegisterSection();
-
-});
-
-
-/*
- * Registration
- */
-
-registerButton.addEventListener("click", async () => {
-
-    const email = registerEmail.value.trim();
-    const password = registerPassword.value;
-
-    if (!email) {
-
-        registerStatus.textContent =
-            "Email is required.";
-
-        return;
+    function showError(message) {
+        errorMessage.textContent = message;
+        errorMessage.style.display = 'block';
+        successMessage.style.display = 'none';
     }
 
-    if (!password) {
-
-        registerStatus.textContent =
-            "Password is required.";
-
-        return;
+    function showSuccess(message) {
+        successMessage.textContent = message;
+        successMessage.style.display = 'block';
+        errorMessage.style.display = 'none';
     }
 
-    registerButton.disabled = true;
+    function hideMessages() {
+        errorMessage.style.display = 'none';
+        successMessage.style.display = 'none';
+    }
 
-    registerStatus.textContent =
-        "Creating account...";
+    function setButtonLoading(button, isLoading) {
+        if (isLoading) {
+            button.dataset.originalText = button.textContent;
+            button.disabled = true;
+            button.innerHTML = '<span class="spinner"></span> Please wait...';
+        } else {
+            button.disabled = false;
+            button.textContent = button.dataset.originalText || 'Submit';
+        }
+    }
 
+    function storeAuthData(token, tokenType) {
+        localStorage.setItem(JWT_STORAGE_KEY, token);
+        localStorage.setItem(TOKEN_TYPE_STORAGE_KEY, tokenType || 'Bearer');
+    }
 
-    try {
+    function getToken() {
+        return localStorage.getItem(JWT_STORAGE_KEY);
+    }
 
-        console.log("Sending registration request.");
+    function getTokenType() {
+        return localStorage.getItem(TOKEN_TYPE_STORAGE_KEY) || 'Bearer';
+    }
 
-        const response = await fetch(
-            "/api/auth/register",
-            {
-                method: "POST",
+    function clearAuthData() {
+        localStorage.removeItem(JWT_STORAGE_KEY);
+        localStorage.removeItem(TOKEN_TYPE_STORAGE_KEY);
+    }
 
+    function redirectToHome() {
+        window.location.href = '/index.html';
+    }
+
+    // ------------------------------------------------------------------
+    // Toggle Between Login and Register
+    // ------------------------------------------------------------------
+
+    let isRegisterMode = false;
+
+    function toggleMode() {
+        isRegisterMode = !isRegisterMode;
+        hideMessages();
+
+        if (isRegisterMode) {
+            loginForm.style.display = 'none';
+            registerForm.style.display = 'flex';
+            toggleText.innerHTML =
+                'Already have an account? ' +
+                '<a href="#" id="toggleLink">Sign in here</a>';
+        } else {
+            loginForm.style.display = 'flex';
+            registerForm.style.display = 'none';
+            toggleText.innerHTML =
+                'Don\'t have an account? ' +
+                '<a href="#" id="toggleLink">Register here</a>';
+        }
+
+        // Re-bind the toggle link after innerHTML change
+        const newToggleLink = document.getElementById('toggleLink');
+        newToggleLink.addEventListener('click', function (event) {
+            event.preventDefault();
+            toggleMode();
+        });
+    }
+
+    // ------------------------------------------------------------------
+    // Login Handler
+    // ------------------------------------------------------------------
+
+    async function handleLogin(event) {
+        event.preventDefault();
+        hideMessages();
+
+        const email = loginEmail.value.trim();
+        const password = loginPassword.value;
+
+        // Basic client-side validation
+        if (!email || !password) {
+            showError('Please enter both email and password.');
+            return;
+        }
+
+        const loginButton = loginForm.querySelector('button[type="submit"]');
+        setButtonLoading(loginButton, true);
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+                method: 'POST',
                 headers: {
-                    "Content-Type": "application/json"
+                    'Content-Type': 'application/json'
                 },
-
                 body: JSON.stringify({
                     email: email,
                     password: password
                 })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                // Extract token from LoginResponse DTO
+                // Fields: accessToken, tokenType, expiresIn
+                const accessToken = data.accessToken;
+                const tokenType = data.tokenType || 'Bearer';
+                const expiresIn = data.expiresIn || 3600;
+
+                if (!accessToken) {
+                    throw new Error('No access token received from server');
+                }
+
+                // Store the JWT token and token type
+                storeAuthData(accessToken, tokenType);
+
+                showSuccess('Login successful! Redirecting...');
+
+                // Redirect to the main application after a short delay
+                setTimeout(redirectToHome, 500);
+            } else {
+                const errorMsg =
+                    data.message ||
+                    data.error ||
+                    'Login failed. Please check your credentials.';
+                showError(errorMsg);
             }
-        );
 
-
-        console.log(
-            "Registration response status:",
-            response.status
-        );
-
-
-        if (!response.ok) {
-
-            const errorText =
-                await response.text();
-
-            throw new Error(
-                "Registration failed: HTTP " +
-                response.status +
-                " " +
-                errorText
+        } catch (error) {
+            console.error('Login error:', error);
+            showError(
+                'Unable to connect to the server. ' +
+                'Please try again later.'
             );
+        } finally {
+            setButtonLoading(loginButton, false);
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Registration Handler
+    // ------------------------------------------------------------------
+
+    async function handleRegister(event) {
+        event.preventDefault();
+        hideMessages();
+
+        const name = registerName.value.trim();
+        const email = registerEmail.value.trim();
+        const password = registerPassword.value;
+
+        // Basic client-side validation
+        if (!name || !email || !password) {
+            showError('Please fill in all fields.');
+            return;
         }
 
-
-        const registrationResponse =
-            await response.json();
-
-        console.log(
-            "Registration successful:",
-            registrationResponse
-        );
-
-
-        registerStatus.textContent =
-            "Registration successful. Please login.";
-
-
-        /*
-         * Put the registered email into login form.
-         */
-
-        loginEmail.value = email;
-
-
-        /*
-         * Move user to login.
-         */
-
-        showLoginSection();
-
-
-    } catch (error) {
-
-        console.error(
-            "Registration error:",
-            error
-        );
-
-        registerStatus.textContent =
-            error.message;
-
-    } finally {
-
-        registerButton.disabled = false;
-    }
-
-});
-
-
-/*
- * Login
- */
-
-loginButton.addEventListener("click", async () => {
-
-    const email = loginEmail.value.trim();
-    const password = loginPassword.value;
-
-
-    if (!email) {
-
-        loginStatus.textContent =
-            "Email is required.";
-
-        return;
-    }
-
-
-    if (!password) {
-
-        loginStatus.textContent =
-            "Password is required.";
-
-        return;
-    }
-
-
-    loginButton.disabled = true;
-
-    loginStatus.textContent =
-        "Logging in...";
-
-
-    try {
-
-        console.log("Sending login request.");
-
-
-        const response = await fetch(
-            "/api/auth/login",
-            {
-                method: "POST",
-
-                headers: {
-                    "Content-Type": "application/json"
-                },
-
-                body: JSON.stringify({
-                    email: email,
-                    password: password
-                })
-            }
-        );
-
-
-        console.log(
-            "Login response status:",
-            response.status
-        );
-
-
-        if (!response.ok) {
-
-            const errorText =
-                await response.text();
-
-            throw new Error(
-                "Login failed: HTTP " +
-                response.status +
-                " " +
-                errorText
-            );
+        if (password.length < 6) {
+            showError('Password must be at least 6 characters long.');
+            return;
         }
 
-
-        const loginResponse =
-            await response.json();
-
-
-        console.log("Login successful.");
-
-
-        if (!loginResponse.accessToken) {
-
-            throw new Error(
-                "Login succeeded but no access token was returned."
-            );
+        if (!isValidEmail(email)) {
+            showError('Please enter a valid email address.');
+            return;
         }
 
-
-        /*
-         * Store JWT.
-         */
-
-        localStorage.setItem(
-            "accessToken",
-            loginResponse.accessToken
-        );
-
-
-        localStorage.setItem(
-            "tokenType",
-            loginResponse.tokenType || "Bearer"
-        );
-
-
-        loginStatus.textContent =
-            "Login successful.";
-
-
-        /*
-         * Open voice agent.
-         */
-
-        showAgentSection();
-
-
-    } catch (error) {
-
-        console.error(
-            "Login error:",
-            error
-        );
-
-        loginStatus.textContent =
-            error.message;
-
-    } finally {
-
-        loginButton.disabled = false;
-    }
-
-});
-
-
-/*
- * Logout
- */
-
-logoutButton.addEventListener("click", () => {
-
-    localStorage.removeItem("accessToken");
-    localStorage.removeItem("tokenType");
-
-    console.log("User logged out.");
-
-    showRegisterSection();
-
-});
-
-
-/*
- * Voice Agent
- */
-
-sendButton.addEventListener("click", async () => {
-
-    console.log("Send button clicked");
-
-
-    const token =
-        localStorage.getItem("accessToken");
-
-
-    /*
-     * JWT must exist.
-     */
-
-    if (!token) {
-
-        console.error(
-            "No access token found."
-        );
-
-        showLoginSection();
-
-        return;
-    }
-
-
-    /*
-     * Get selected audio file.
-     */
-
-    const file =
-        audioInput.files[0];
-
-
-    if (!file) {
-
-        status.textContent =
-            "Please select an audio file first.";
-
-        return;
-    }
-
-
-    console.log(
-        "Selected file:",
-        file.name
-    );
-
-
-    console.log(
-        "File type:",
-        file.type
-    );
-
-
-    console.log(
-        "File size:",
-        file.size
-    );
-
-
-    /*
-     * Display user message.
-     */
-
-    addMessage(
-        "You",
-        "Audio: " + file.name,
-        "user-message"
-    );
-
-
-    status.textContent =
-        "Sending audio to voice agent...";
-
-
-    sendButton.disabled = true;
-
-
-    try {
-
-        const formData =
-            new FormData();
-
-
-        formData.append(
-            "file",
-            file
-        );
-
-
-        console.log(
-            "Calling protected endpoint:"
-        );
-
-
-        console.log(
-            "POST /api/final/process"
-        );
-
-
-        /*
-         * IMPORTANT:
-         *
-         * Do NOT manually set Content-Type.
-         *
-         * Browser sets multipart/form-data
-         * boundary automatically.
-         */
-
-        const response =
-            await fetch(
-                "/api/final/process",
+        const registerButton =
+            registerForm.querySelector('button[type="submit"]');
+        setButtonLoading(registerButton, true);
+
+        try {
+            const response = await fetch(
+                `${API_BASE_URL}/api/auth/register`,
                 {
-                    method: "POST",
-
+                    method: 'POST',
                     headers: {
-                        "Authorization":
-                            "Bearer " + token
+                        'Content-Type': 'application/json'
                     },
-
-                    body: formData
+                    body: JSON.stringify({
+                        name: name,
+                        email: email,
+                        password: password
+                    })
                 }
             );
 
+            const data = await response.json();
 
-        console.log(
-            "Backend HTTP status:",
-            response.status
-        );
-
-
-        /*
-         * Authentication/authorization failure.
-         */
-
-        if (
-            response.status === 401 ||
-            response.status === 403
-        ) {
-
-            localStorage.removeItem(
-                "accessToken"
-            );
-
-            localStorage.removeItem(
-                "tokenType"
-            );
-
-
-            showLoginSection();
-
-
-            throw new Error(
-                "Authentication failed. Please login again."
-            );
-        }
-
-
-        /*
-         * Other backend error.
-         */
-
-        if (!response.ok) {
-
-            const errorText =
-                await response.text();
-
-
-            throw new Error(
-                "Backend returned HTTP " +
-                response.status +
-                ": " +
-                errorText
-            );
-        }
-
-
-        console.log(
-            "Authenticated request successful."
-        );
-
-
-        /*
-         * Receive MP3.
-         */
-
-        const audioBlob =
-            await response.blob();
-
-
-        console.log(
-            "Received audio:",
-            audioBlob.type,
-            audioBlob.size,
-            "bytes"
-        );
-
-
-        if (audioBlob.size === 0) {
-
-            throw new Error(
-                "Backend returned empty audio."
-            );
-        }
-
-
-        /*
-         * Display agent message.
-         *
-         * Currently the backend endpoint
-         * returns only audio, so we cannot
-         * display the actual Gemma response
-         * yet.
-         */
-
-        addMessage(
-            "Agent",
-            "Voice response received.",
-            "agent-message"
-        );
-
-
-        /*
-         * Create audio URL.
-         */
-
-        const audioUrl =
-            URL.createObjectURL(
-                audioBlob
-            );
-
-
-        const audio =
-            new Audio(audioUrl);
-
-
-        audio.addEventListener(
-            "ended",
-            () => {
-
-                URL.revokeObjectURL(
-                    audioUrl
+            if (response.ok) {
+                showSuccess(
+                    'Registration successful! ' +
+                    'You can now sign in.'
                 );
 
-                status.textContent =
-                    "Ready";
+                // Clear the registration form
+                registerName.value = '';
+                registerEmail.value = '';
+                registerPassword.value = '';
 
-                sendButton.disabled =
-                    false;
+                // Switch to login mode after a short delay
+                setTimeout(function () {
+                    if (isRegisterMode) {
+                        toggleMode();
+                    }
+                    // Pre-fill the login email
+                    loginEmail.value = email;
+                }, 1500);
+
+            } else {
+                const errorMsg =
+                    data.message ||
+                    data.error ||
+                    'Registration failed. Please try again.';
+                showError(errorMsg);
             }
-        );
 
-
-        status.textContent =
-            "Playing response...";
-
-
-        /*
-         * Play through the user's
-         * default audio output/headphones.
-         */
-
-        await audio.play();
-
-
-    } catch (error) {
-
-        console.error(
-            "Voice agent error:",
-            error
-        );
-
-
-        addMessage(
-            "Agent",
-            "Error: " + error.message,
-            "agent-message"
-        );
-
-
-        status.textContent =
-            "Error";
-
-
-        sendButton.disabled =
-            false;
+        } catch (error) {
+            console.error('Registration error:', error);
+            showError(
+                'Unable to connect to the server. ' +
+                'Please try again later.'
+            );
+        } finally {
+            setButtonLoading(registerButton, false);
+        }
     }
 
-});
+    // ------------------------------------------------------------------
+    // Validation Helpers
+    // ------------------------------------------------------------------
 
+    function isValidEmail(email) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        return emailRegex.test(email);
+    }
 
-/*
- * Add chat message
- */
+    // ------------------------------------------------------------------
+    // Redirect if Already Authenticated
+    // ------------------------------------------------------------------
 
-function addMessage(
-    label,
-    content,
-    messageClass
-) {
+    function checkExistingSession() {
+        const token = getToken();
 
-    const message =
-        document.createElement("div");
+        if (token) {
+            // Token exists, redirect to main app
+            redirectToHome();
+        }
+    }
 
+    // ------------------------------------------------------------------
+    // Event Listeners
+    // ------------------------------------------------------------------
 
-    message.className =
-        "message " + messageClass;
+    loginForm.addEventListener('submit', handleLogin);
+    registerForm.addEventListener('submit', handleRegister);
 
+    toggleLink.addEventListener('click', function (event) {
+        event.preventDefault();
+        toggleMode();
+    });
 
-    const messageLabel =
-        document.createElement("div");
+    // ------------------------------------------------------------------
+    // Initialize
+    // ------------------------------------------------------------------
 
-
-    messageLabel.className =
-        "message-label";
-
-
-    messageLabel.textContent =
-        label;
-
-
-    const messageContent =
-        document.createElement("div");
-
-
-    messageContent.className =
-        "message-content";
-
-
-    messageContent.textContent =
-        content;
-
-
-    message.appendChild(
-        messageLabel
-    );
-
-
-    message.appendChild(
-        messageContent
-    );
-
-
-    chatMessages.appendChild(
-        message
-    );
-
-
-    chatMessages.scrollTop =
-        chatMessages.scrollHeight;
-}
-
-
-/*
- * Show registration
- */
-
-function showRegisterSection() {
-
-    authSection.hidden = false;
-
-    registerSection.hidden = false;
-
-    loginSection.hidden = true;
-
-    agentSection.hidden = true;
-
-}
-
-
-/*
- * Show login
- */
-
-function showLoginSection() {
-
-    authSection.hidden = false;
-
-    registerSection.hidden = true;
-
-    loginSection.hidden = false;
-
-    agentSection.hidden = true;
-
-}
-
-
-/*
- * Show voice agent
- */
-
-function showAgentSection() {
-
-    authSection.hidden = true;
-
-    registerSection.hidden = true;
-
-    loginSection.hidden = true;
-
-    agentSection.hidden = false;
-
-    status.textContent =
-        "Ready";
-}
+    checkExistingSession();
+})();

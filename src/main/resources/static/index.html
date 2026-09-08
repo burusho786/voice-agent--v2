@@ -3,133 +3,110 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-    <title>Voice Agent</title>
-
-    <link rel="stylesheet" href="style.css">
+    <title>Voice Agent — Login</title>
+    <link rel="stylesheet" href="login.css">
 </head>
-
 <body>
 
-<div class="container">
+<div class="auth-container">
 
-    <h1>Voice Agent</h1>
+    <!-- Logo / Brand -->
+    <div class="auth-header">
+        <h1>Voice Agent</h1>
+        <p>Sign in to continue</p>
+    </div>
 
-    <!-- Authentication Section -->
-    <section id="authSection">
+    <!-- Error Message Area -->
+    <div id="errorMessage" class="error-message" style="display: none;"></div>
 
-        <!-- Registration -->
-        <div id="registerSection">
+    <!-- Success Message Area -->
+    <div id="successMessage" class="success-message" style="display: none;"></div>
 
-            <h2>Create Account</h2>
-
+    <!-- Login Form -->
+    <form id="loginForm" class="auth-form">
+        <div class="form-group">
+            <label for="loginEmail">Email</label>
             <input
-                    id="registerEmail"
                     type="email"
-                    placeholder="Email"
-            >
-
-            <input
-                    id="registerPassword"
-                    type="password"
-                    placeholder="Password"
-            >
-
-            <button id="registerButton">
-                Register
-            </button>
-
-            <p id="registerStatus"></p>
-
-            <p>
-                Already have an account?
-                <button id="showLoginButton">
-                    Login
-                </button>
-            </p>
-
-        </div>
-
-
-        <!-- Login -->
-        <div id="loginSection" hidden>
-
-            <h2>Login</h2>
-
-            <input
                     id="loginEmail"
-                    type="email"
-                    placeholder="Email"
+                    name="email"
+                    placeholder="you@example.com"
+                    required
+                    autocomplete="email"
             >
+        </div>
 
+        <div class="form-group">
+            <label for="loginPassword">Password</label>
             <input
-                    id="loginPassword"
                     type="password"
-                    placeholder="Password"
+                    id="loginPassword"
+                    name="password"
+                    placeholder="Your password"
+                    required
+                    autocomplete="current-password"
             >
-
-            <button id="loginButton">
-                Login
-            </button>
-
-            <p id="loginStatus"></p>
-
-            <p>
-                Don't have an account?
-                <button id="showRegisterButton">
-                    Register
-                </button>
-            </p>
-
         </div>
 
-    </section>
+        <button type="submit" class="auth-button">
+            Sign In
+        </button>
+    </form>
 
-
-    <!-- Voice Agent Section -->
-    <section id="agentSection" hidden>
-
-        <div class="agent-header">
-
-            <h2>Voice Agent</h2>
-
-            <button id="logoutButton">
-                Logout
-            </button>
-
-        </div>
-
-
-        <div id="chatMessages" class="chat-messages">
-
-        </div>
-
-
-        <div class="controls">
-
+    <!-- Registration Form (Hidden by default) -->
+    <form id="registerForm" class="auth-form" style="display: none;">
+        <div class="form-group">
+            <label for="registerName">Full Name</label>
             <input
-                    id="audioInput"
-                    type="file"
-                    accept="audio/*"
+                    type="text"
+                    id="registerName"
+                    name="name"
+                    placeholder="John Doe"
+                    required
+                    autocomplete="name"
             >
-
-            <button id="sendButton">
-                Send
-            </button>
-
         </div>
 
+        <div class="form-group">
+            <label for="registerEmail">Email</label>
+            <input
+                    type="email"
+                    id="registerEmail"
+                    name="email"
+                    placeholder="you@example.com"
+                    required
+                    autocomplete="email"
+            >
+        </div>
 
-        <p id="status">
-            Ready
+        <div class="form-group">
+            <label for="registerPassword">Password</label>
+            <input
+                    type="password"
+                    id="registerPassword"
+                    name="password"
+                    placeholder="Minimum 6 characters"
+                    required
+                    minlength="6"
+                    autocomplete="new-password"
+            >
+        </div>
+
+        <button type="submit" class="auth-button">
+            Create Account
+        </button>
+    </form>
+
+    <!-- Toggle Between Login and Register -->
+    <div class="auth-toggle">
+        <p id="toggleText">
+            Don't have an account?
+            <a href="#" id="toggleLink">Register here</a>
         </p>
-
-    </section>
+    </div>
 
 </div>
 
-
-<script src="app.js"></script>
-
+<script src="login.js"></script>
 </body>
 </html>

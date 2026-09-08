@@ -43,16 +43,18 @@ public class SecurityConfig {
                                 "/api/auth/login"
                         ).permitAll()
 
+                        .requestMatchers("/api/final/**").permitAll()
+
                         // Protected voice/RAG endpoints
                         .requestMatchers(
                                 "/api/voice/**",
-                                "/api/final/**",
                                 "/api/rag/query"
                         ).hasAnyRole("USER", "ADMIN")
 
                         // Document endpoints
                         .requestMatchers(
                                 "/api/documents/ingest",
+                        //"/api/voice/**",
                                 "/api/documents/**"
                         ).hasAnyRole("ADMIN", "USER")
 
