@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Voice Agent</title>
+
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+<div class="container">
+
+    <h1>Voice Agent</h1>
+
+    <!-- Authentication Section -->
+    <section id="authSection">
+
+        <!-- Registration -->
+        <div id="registerSection">
+
+            <h2>Create Account</h2>
+
+            <input
+                    id="registerEmail"
+                    type="email"
+                    placeholder="Email"
+            >
+
+            <input
+                    id="registerPassword"
+                    type="password"
+                    placeholder="Password"
+            >
+
+            <button id="registerButton">
+                Register
+            </button>
+
+            <p id="registerStatus"></p>
+
+            <p>
+                Already have an account?
+                <button id="showLoginButton">
+                    Login
+                </button>
+            </p>
+
+        </div>
+
+
+        <!-- Login -->
+        <div id="loginSection" hidden>
+
+            <h2>Login</h2>
+
+            <input
+                    id="loginEmail"
+                    type="email"
+                    placeholder="Email"
+            >
+
+            <input
+                    id="loginPassword"
+                    type="password"
+                    placeholder="Password"
+            >
+
+            <button id="loginButton">
+                Login
+            </button>
+
+            <p id="loginStatus"></p>
+
+            <p>
+                Don't have an account?
+                <button id="showRegisterButton">
+                    Register
+                </button>
+            </p>
+
+        </div>
+
+    </section>
+
+
+    <!-- Voice Agent Section -->
+    <section id="agentSection" hidden>
+
+        <div class="agent-header">
+
+            <h2>Voice Agent</h2>
+
+            <button id="logoutButton">
+                Logout
+            </button>
+
+        </div>
+
+
+        <div id="chatMessages" class="chat-messages">
+
+        </div>
+
+
+        <div class="controls">
+
+            <input
+                    id="audioInput"
+                    type="file"
+                    accept="audio/*"
+            >
+
+            <button id="sendButton">
+                Send
+            </button>
+
+        </div>
+
+
+        <p id="status">
+            Ready
+        </p>
+
+    </section>
+
+</div>
+
+
+<script src="app.js"></script>
+
+</body>
+</html>

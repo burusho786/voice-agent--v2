@@ -165,7 +165,9 @@ public class VoiceAgentService {
                 "LLM completed in {} ms | Response length: {} characters",
                 llmTime,
                 responseText.length()
+
         );
+        System.out.println("output is " + responseText);
 
 
         /*

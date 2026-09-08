@@ -15,7 +15,7 @@ import java.io.IOException;
 @RestController
 @RequestMapping("/api/final")
 public class VoiceAgentController {
-    Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+
 
     private final VoiceAgentService voiceAgentService;
     private final AudioFileValidator audioFileValidator;
@@ -37,21 +37,10 @@ public class VoiceAgentController {
             @RequestParam("file") MultipartFile file
     ) throws IOException {
 
-        /*
-         * Validate the uploaded audio file before
-         * sending anything to Deepgram.
-         */
+
         audioFileValidator.validate(file);
 
-        /*
-         * Execute:
-         *
-         * Audio
-         *   -> Deepgram STT
-         *   -> Gemma
-         *   -> Deepgram TTS
-         *   -> Audio
-         */
+
         byte[] responseAudio =
                 voiceAgentService.process(
                         file.getBytes(),
