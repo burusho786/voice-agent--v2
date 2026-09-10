@@ -36,10 +36,26 @@ public class VoiceAgentService {
         this.deepgramTtsService = deepgramTtsService;
     }
 
-    public byte[] process(
+    /**
+     * Backwards-compatible entry point. Returns only synthesized audio.
+     * Serves POST /api/final/process.
+     */
+    public byte[] process(byte[] audioBytes, String contentType) {
+        return runPipeline(audioBytes, contentType).audio();
+    }
+
+    /**
+     * Full pipeline result including transcript and LLM text.
+     * Serves POST /api/final/process-with-metadata.
+     */
+    public PipelineResult processWithMetadata(
             byte[] audioBytes,
             String contentType
     ) {
+        return runPipeline(audioBytes, contentType);
+    }
+
+    private PipelineResult runPipeline(byte[] audioBytes, String contentType) {
 
         long totalStart = System.currentTimeMillis();
 
@@ -49,26 +65,15 @@ public class VoiceAgentService {
                 contentType
         );
 
-        /*
-         * ============================================================
-         * STEP 1
-         * Audio -> Deepgram -> Transcript
-         * ============================================================
-         */
-
+        /* STEP 1 — Audio -> Deepgram STT -> Transcript */
         long sttStart = System.currentTimeMillis();
 
         TranscriptionResponse transcription =
-                deepgramService.transcribe(
-                        audioBytes,
-                        contentType
-                );
+                deepgramService.transcribe(audioBytes, contentType);
 
-        long sttTime =
-                System.currentTimeMillis() - sttStart;
+        long sttTime = System.currentTimeMillis() - sttStart;
 
-        String transcript =
-                transcription.transcript();
+        String transcript = transcription.transcript();
 
         if (transcript == null || transcript.isBlank()) {
             throw new IllegalArgumentException(
@@ -76,30 +81,15 @@ public class VoiceAgentService {
             );
         }
 
-        log.info(
-                "STT completed in {} ms | Transcript: {}",
-                sttTime,
-                transcript
-        );
+        log.info("STT completed in {} ms | Transcript: {}", sttTime, transcript);
 
-
-        /*
-         * ============================================================
-         * STEP 2
-         * Transcript -> RAG Retrieval
-         * ============================================================
-         */
-
+        /* STEP 2 — Transcript -> RAG Retrieval */
         long ragStart = System.currentTimeMillis();
 
         List<VectorSearchResult> results =
-                ragRetrievalService.retrieve(
-                        transcript,
-                        1
-                );
+                ragRetrievalService.retrieve(transcript, 1);
 
-        long ragTime =
-                System.currentTimeMillis() - ragStart;
+        long ragTime = System.currentTimeMillis() - ragStart;
 
         if (results == null || results.isEmpty()) {
             throw new IllegalStateException(
@@ -113,79 +103,39 @@ public class VoiceAgentService {
                 results.size()
         );
 
-
-        /*
-         * ============================================================
-         * STEP 3
-         * Question + Retrieved Context -> Prompt
-         * ============================================================
-         */
-
-        String prompt =
-                ragPromptBuilder.build(
-                        transcript,
-                        results
-                );
+        /* STEP 3 — Question + Context -> Prompt */
+        String prompt = ragPromptBuilder.build(transcript, results);
 
         log.info(
                 "RAG prompt built successfully | Context chunks: {}",
                 results.size()
         );
 
-
-        /*
-         * ============================================================
-         * STEP 4
-         * RAG Prompt -> Gemma
-         * ============================================================
-         */
-
+        /* STEP 4 — Prompt -> Gemma */
         long llmStart = System.currentTimeMillis();
 
-        LlmResponse llmResponse =
-                ollamaLlmService.generateResponse(
-                        prompt
-                );
+        LlmResponse llmResponse = ollamaLlmService.generateResponse(prompt);
 
-        long llmTime =
-                System.currentTimeMillis() - llmStart;
+        long llmTime = System.currentTimeMillis() - llmStart;
 
-        String responseText =
-                llmResponse.response();
+        String responseText = llmResponse.response();
 
-        if (responseText == null ||
-                responseText.isBlank()) {
-
-            throw new IllegalStateException(
-                    "LLM returned an empty response"
-            );
+        if (responseText == null || responseText.isBlank()) {
+            throw new IllegalStateException("LLM returned an empty response");
         }
 
         log.info(
                 "LLM completed in {} ms | Response length: {} characters",
                 llmTime,
                 responseText.length()
-
         );
-        System.out.println("output is " + responseText);
 
-
-        /*
-         * ============================================================
-         * STEP 5
-         * Gemma Response -> Deepgram TTS -> Audio
-         * ============================================================
-         */
-
+        /* STEP 5 — Response -> Deepgram TTS -> Audio */
         long ttsStart = System.currentTimeMillis();
 
-        byte[] audioResponse =
-                deepgramTtsService.synthesize(
-                        responseText
-                );
+        byte[] audioResponse = deepgramTtsService.synthesize(responseText);
 
-        long ttsTime =
-                System.currentTimeMillis() - ttsStart;
+        long ttsTime = System.currentTimeMillis() - ttsStart;
 
         log.info(
                 "TTS completed in {} ms | Audio size: {} bytes",
@@ -193,30 +143,24 @@ public class VoiceAgentService {
                 audioResponse.length
         );
 
-
-        /*
-         * ============================================================
-         * TOTAL PIPELINE TIME
-         * ============================================================
-         */
-
-        long totalTime =
-                System.currentTimeMillis() - totalStart;
+        long totalTime = System.currentTimeMillis() - totalStart;
 
         log.info(
-                "VOICE PIPELINE COMPLETED | " +
-                        "STT: {} ms | " +
-                        "RAG: {} ms | " +
-                        "LLM: {} ms | " +
-                        "TTS: {} ms | " +
-                        "TOTAL: {} ms",
-                sttTime,
-                ragTime,
-                llmTime,
-                ttsTime,
-                totalTime
+                "VOICE PIPELINE COMPLETED | STT: {} ms | RAG: {} ms | LLM: {} ms | TTS: {} ms | TOTAL: {} ms",
+                sttTime, ragTime, llmTime, ttsTime, totalTime
         );
 
-        return audioResponse;
+        return new PipelineResult(transcript, responseText, audioResponse);
+    }
+
+    /**
+     * Internal carrier of the full pipeline output.
+     * Not serialized to HTTP clients directly.
+     */
+    public record PipelineResult(
+            String transcript,
+            String responseText,
+            byte[] audio
+    ) {
     }
 }

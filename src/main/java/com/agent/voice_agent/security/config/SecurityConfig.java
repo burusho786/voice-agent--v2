@@ -42,8 +42,19 @@ public class SecurityConfig {
                                 "/api/auth/register",
                                 "/api/auth/login"
                         ).permitAll()
+                        .requestMatchers(
+                                "/",
+                                "/index.html",
+                                "/favicon.ico",
+                                "/static/**",
+                                "/css/**",
+                                "/js/**"
+                        ).permitAll()
 
-                        .requestMatchers("/api/final/**").permitAll()
+                        .requestMatchers("/api/final/**")
+                        .hasAnyRole("USER", "ADMIN")
+
+                       // .requestMatchers("/api/final/**").permitAll()
 
                         // Protected voice/RAG endpoints
                         .requestMatchers(

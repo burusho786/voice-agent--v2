@@ -1,6 +1,8 @@
 package com.agent.voice_agent.component;
 
 import com.agent.voice_agent.config.AudioProperties;
+import org.springframework.http.InvalidMediaTypeException;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -35,14 +37,33 @@ public class AudioFileValidator {
 
     private void validateContentType(MultipartFile file) {
 
-        String contentType = file.getContentType();
+        String rawContentType = file.getContentType();
 
-        if (contentType == null
-                || !audioProperties.allowedContentTypes()
-                .contains(contentType.toLowerCase())) {
+        if (rawContentType == null || rawContentType.isBlank()) {
+            throw new IllegalArgumentException("Audio content type is missing");
+        }
 
+        /*
+         * Browsers send Content-Type with parameters, e.g.
+         *   audio/webm;codecs=opus
+         *   audio/ogg;codecs=opus
+         * We must compare only the base media type
+         * (audio/webm, audio/ogg, ...) against the allow-list.
+         */
+        String baseType;
+        try {
+            MediaType mediaType = MediaType.parseMediaType(rawContentType);
+            baseType = (mediaType.getType() + "/" + mediaType.getSubtype())
+                    .toLowerCase();
+        } catch (InvalidMediaTypeException e) {
             throw new IllegalArgumentException(
-                    "Unsupported audio content type: " + contentType
+                    "Invalid audio content type: " + rawContentType
+            );
+        }
+
+        if (!audioProperties.allowedContentTypes().contains(baseType)) {
+            throw new IllegalArgumentException(
+                    "Unsupported audio content type: " + rawContentType
             );
         }
     }

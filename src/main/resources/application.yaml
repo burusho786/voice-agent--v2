@@ -1,6 +1,13 @@
 spring:
   application:
     name: voice-agent
+  web:
+    resources:
+      cache:
+        cachecontrol:
+          no-cache: true
+          no-store: true
+          must-revalidate: true
 
   data:
     mongodb:
@@ -12,6 +19,12 @@ spring:
 
 server:
   port: 8080
+  ssl:
+    enabled: true
+    key-store: classpath:keystore.p12
+    key-store-password: changeit
+    key-store-type: PKCS12
+    key-alias: voiceagent
 
 deepgram:
   api-key: de0ea318988a5fdfa7fbd9dd380cdea88ff9730f
