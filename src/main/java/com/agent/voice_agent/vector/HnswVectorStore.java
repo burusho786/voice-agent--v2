@@ -17,7 +17,7 @@ import java.util.Map;
 @Component
 public class HnswVectorStore implements VectorStore {
 
-    private static final int MAX_ITEM_COUNT = 10_000;
+    private static final int MAX_ITEM_COUNT = 50000;
 
     private static final int M = 16;
 

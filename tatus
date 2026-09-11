@@ -1,0 +1,101 @@
+[33mcommit 875216c3358a27d45b0afb6e6cb5baa00c0d3913[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m
+Author: Sohail Ahmed <sohail.ahmed989796@gmail.com>
+Date:   Thu Sep 10 17:56:14 2026 +0500
+
+    ui with security is implemented
+
+[33mcommit fe125a5eafbc4643a30a7b2c014a4352d8485964[m[33m ([m[1;32mbackup-before-restore[m[33m)[m
+Author: Sohail Ahmed <sohail.ahmed989796@gmail.com>
+Date:   Tue Sep 8 15:37:39 2026 +0500
+
+    changes the security config for the frontend
+
+[33mcommit 34a98d3f331f9860d8603b0fbc7d991bbe4baa84[m
+Author: Sohail Ahmed <sohail.ahmed989796@gmail.com>
+Date:   Tue Sep 8 12:42:15 2026 +0500
+
+    chuking service has being modified
+
+[33mcommit ed0a49737fbc00f61c0ae155f7b9206987a34f5e[m
+Author: Sohail Ahmed <sohail.ahmed989796@gmail.com>
+Date:   Fri Sep 4 12:14:55 2026 +0500
+
+    added jwt on the integrated api
+
+[33mcommit 101a8dfc4e59ac18b67e4b4a21123f608b3d3002[m
+Author: Sohail Ahmed <sohail.ahmed989796@gmail.com>
+Date:   Fri Sep 4 12:11:44 2026 +0500
+
+    added jwt on the integrated endpoint
+
+[33mcommit 4c8e40c7730b26e62118969e48c1a0a74e33969a[m
+Author: Sohail Ahmad <139639606+burusho786@users.noreply.github.com>
+Date:   Tue Aug 25 19:09:20 2026 +0500
+
+    readme
+
+[33mcommit 29edf8d82baa65630f89287916190908b66437da[m
+Author: Sohail Ahmad <139639606+burusho786@users.noreply.github.com>
+Date:   Tue Aug 25 19:08:53 2026 +0500
+
+    dfs
+
+[33mcommit cd30dbec0249d4575e294aa71932a8d15be229bf[m
+Author: Sohail Ahmed <sohail.ahmed989796@gmail.com>
+Date:   Mon Aug 17 04:11:09 2026 +0500
+
+    optimization done
+
+[33mcommit a279a54900ba73c77ba2cca578a5b415db4b32a4[m
+Author: Sohail Ahmed <sohail.ahmed989796@gmail.com>
+Date:   Mon Aug 17 03:46:56 2026 +0500
+
+    integrated the voice-agent and ragsytem (voiceagent service /deepgram service)
+
+[33mcommit 013b06e40b0fce9393a508db438dd24e3aac5b49[m
+Author: Sohail Ahmed <sohail.ahmed989796@gmail.com>
+Date:   Mon Aug 17 01:10:39 2026 +0500
+
+    the vetors are saved to the in memory hnsw vectore store to retrival of chunks (working well with the retrival of chunks)
+
+[33mcommit ce2494e483c3f3f0125c91eb1a80b50a004957f0[m
+Author: Sohail Ahmed <sohail.ahmed989796@gmail.com>
+Date:   Sun Aug 16 20:51:58 2026 +0500
+
+    document ingest/chunking/vectors 1 stage of rag implementaion
+
+[33mcommit c5b46b8201118e552e95e01aa85b7c46c7b9f609[m
+Author: Sohail Ahmed <sohail.ahmed989796@gmail.com>
+Date:   Sun Aug 16 06:38:06 2026 +0500
+
+    complete deepgram, ollama , tts service integrated
+
+[33mcommit 2871fec4d3098777ca21a8909dada39a194913fd[m
+Author: Sohail Ahmed <sohail.ahmed989796@gmail.com>
+Date:   Sun Aug 16 01:52:03 2026 +0500
+
+    gemma3 is setup is complete
+
+[33mcommit ef5b4c27cb3fd440b7184a7467238ac19e190e7f[m
+Author: Sohail Ahmed <sohail.ahmed989796@gmail.com>
+Date:   Sat Aug 15 22:12:14 2026 +0500
+
+    complete validation around deepgram api
+
+[33mcommit 177a06fc0ae10e27fd9e2517b8d554262fac81f6[m
+Author: Sohail Ahmed <sohail.ahmed989796@gmail.com>
+Date:   Sat Aug 15 21:53:51 2026 +0500
+
+    added validation on for the input file
+
+[33mcommit 7d0d124dbba558821e1f3d6cad4e2100549b352c[m
+Author: Sohail Ahmed <sohail.ahmed989796@gmail.com>
+Date:   Sat Aug 15 20:51:36 2026 +0500
+
+    fixing the deepgram service and updating the configuration accordingly
+
+[33mcommit 4423fe75c2759a2d958723a8aa95a9de08bde146[m
+Author: Sohail Ahmed <sohail.ahmed989796@gmail.com>
+Date:   Sat Aug 15 20:38:49 2026 +0500
+
+    adding the deeepgram service to voice agent

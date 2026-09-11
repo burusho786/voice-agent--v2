@@ -2,21 +2,31 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
     <title>Voice</title>
     <style>
         :root {
-          --bg:           #0a0a0b;
-          --surface:      #141416;
-          --surface-2:    #1b1b1e;
-          --border:       #202024;
-          --border-strong:#2c2c31;
-          --text:         #ededf0;
-          --text-muted:   #7c7c85;
-          --text-dim:     #55555c;
-          --accent:       #f5f5f7;
-          --danger:       #ff4d4d;
-          --success:      #58d68d;
+          --bg:            #f4f4f6;
+          --surface:       #ffffff;
+          --surface-2:     #ededf1;
+          --surface-3:     #e3e3e8;
+          --border:        #e2e2e8;
+          --border-strong: #cacad2;
+          --text:          #1a1a1f;
+          --text-muted:    #6e6e78;
+          --text-dim:      #9a9aa5;
+          --accent:        #2a2a30;
+          --danger:        #e85c5c;
+          --danger-soft:   #ff8a8a;
+          --success:       #4ba86a;
+
+          --bubble-idle-hi:   #ffffff;
+          --bubble-idle-lo:   #d8d8de;
+          --bubble-rec-hi:    #ffffff;
+          --bubble-rec-lo:    #ffb8b8;
+
+          --glow-idle: rgba(140, 140, 155, 0.35);
+          --glow-rec:  rgba(232,  92,  92, 0.55);
         }
 
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -33,7 +43,7 @@
         }
 
         /* ============================================================
-           AUTH SCREEN — centered, borderless, hairline inputs
+           AUTH SCREEN
            ============================================================ */
 
         .login-screen {
@@ -56,7 +66,7 @@
         .login-card h1 {
           margin: 0 0 4px;
           font-size: 15px;
-          font-weight: 500;
+          font-weight: 600;
           letter-spacing: 0.08em;
           text-transform: uppercase;
           color: var(--text);
@@ -81,19 +91,15 @@
           outline: none;
           transition: border-color 0.2s;
         }
-        .login-card input::placeholder {
-          color: var(--text-dim);
-        }
-        .login-card input:focus {
-          border-bottom-color: var(--accent);
-        }
+        .login-card input::placeholder { color: var(--text-dim); }
+        .login-card input:focus { border-bottom-color: var(--accent); }
 
         .login-card button[type="submit"] {
           margin-top: 24px;
           width: 100%;
           padding: 13px 16px;
           background: var(--accent);
-          color: #0a0a0b;
+          color: #ffffff;
           border: none;
           border-radius: 8px;
           font-size: 14px;
@@ -125,11 +131,11 @@
           min-height: 18px;
           color: var(--text-muted);
         }
-        .auth-msg.error   { color: #ff8080; }
+        .auth-msg.error   { color: #c43838; }
         .auth-msg.success { color: var(--success); }
 
         /* ============================================================
-           CHAT SCREEN — full-height column
+           CHAT SCREEN
            ============================================================ */
 
         .app {
@@ -139,6 +145,7 @@
           height: 100dvh;
           max-width: 720px;
           margin: 0 auto;
+          background: var(--bg);
         }
         .app.active { display: flex; }
 
@@ -148,6 +155,7 @@
           gap: 10px;
           padding: 16px 20px;
           border-bottom: 1px solid var(--border);
+          background: var(--surface);
         }
         header .dot {
           width: 6px;
@@ -159,7 +167,7 @@
           flex: 1;
           margin: 0;
           font-size: 14px;
-          font-weight: 500;
+          font-weight: 600;
           letter-spacing: 0.02em;
           color: var(--text);
         }
@@ -196,19 +204,18 @@
           to   { opacity: 1; transform: translateY(0); }
         }
 
-        /* user: subtle surface pill, right-aligned */
         .msg.user {
           align-self: flex-end;
           max-width: 82%;
           padding: 10px 14px;
-          background: var(--surface-2);
+          background: var(--surface);
           border: 1px solid var(--border);
           border-radius: 14px;
           border-bottom-right-radius: 4px;
           color: var(--text);
+          box-shadow: 0 1px 2px rgba(0,0,0,0.03);
         }
 
-        /* agent: plain text, no bubble — quieter visual weight */
         .msg.agent {
           align-self: flex-start;
           max-width: 88%;
@@ -227,10 +234,11 @@
           align-self: center;
           max-width: 90%;
           text-align: center;
-          color: #ff8080;
+          color: #c43838;
           font-size: 13px;
           padding: 8px 12px;
-          border: 1px solid #3a1e1e;
+          border: 1px solid #f0c4c4;
+          background: #fff5f5;
           border-radius: 10px;
         }
 
@@ -255,7 +263,7 @@
         }
 
         /* ============================================================
-           FOOTER — status text + minimal record button
+           FOOTER — status + interactive bubble
            ============================================================ */
 
         footer {
@@ -263,97 +271,237 @@
           flex-direction: column;
           align-items: center;
           gap: 12px;
-          padding: 20px 20px 28px;
+          padding: 26px 20px 36px;
           border-top: 1px solid var(--border);
+          background: var(--surface);
+          position: relative;
         }
 
         #status {
           font-size: 12.5px;
           color: var(--text-muted);
           min-height: 16px;
-          transition: color 0.15s;
+          transition: color 0.2s;
           letter-spacing: 0.01em;
+          user-select: none;
         }
         #status.recording  { color: var(--danger); }
         #status.processing { color: var(--text); }
 
-        .btn-wrap { position: relative; }
-
-        #recordBtn {
-          width: 58px;
-          height: 58px;
-          border-radius: 50%;
-          background: transparent;
-          border: 1.5px solid var(--border-strong);
-          color: transparent;      /* hides the emoji/text set by JS */
-          font-size: 0;            /* belt-and-braces */
-          cursor: pointer;
+        .btn-wrap {
           position: relative;
-          transition: border-color 0.2s, transform 0.08s;
           display: flex;
           align-items: center;
           justify-content: center;
+          width: 160px;
+          height: 160px;
         }
 
-        /* inner dot (idle) */
+        /* ---------- oscillator (rings above the bubble) ---------- */
+
+        .osc {
+          position: absolute;
+          top: -6px;
+          left: 50%;
+          transform: translateX(-50%);
+          width: 6px;
+          height: 6px;
+          pointer-events: none;
+          display: none;
+        }
+        .osc.active { display: block; }
+
+        .osc .ring {
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          width: 8px;
+          height: 8px;
+          margin: -4px 0 0 -4px;
+          border-radius: 50%;
+          background: var(--danger-soft);
+          opacity: 0.6;
+          animation: osc 1.6s ease-out infinite;
+        }
+        .osc .ring:nth-child(2) { animation-delay: 0.4s; }
+        .osc .ring:nth-child(3) { animation-delay: 0.8s; }
+
+        @keyframes osc {
+          0%   { transform: scale(0.8); opacity: 0.65; }
+          80%  { transform: scale(3.2); opacity: 0; }
+          100% { transform: scale(3.2); opacity: 0; }
+        }
+
+        /* ---------- the glowing bubble ---------- */
+
+        #recordBtn {
+          position: relative;
+          width: 96px;
+          height: 96px;
+          border-radius: 50%;
+          border: none;
+          background: radial-gradient(
+            circle at 32% 28%,
+            var(--bubble-idle-hi) 0%,
+            #ececf1 45%,
+            var(--bubble-idle-lo) 100%
+          );
+          box-shadow:
+            0 10px 24px rgba(60, 60, 80, 0.10),
+            0 2px 6px rgba(60, 60, 80, 0.06),
+            inset 0 -6px 14px rgba(120, 120, 140, 0.18),
+            inset 0 6px 10px rgba(255, 255, 255, 0.9),
+            0 0 0 0 var(--glow-idle);
+          cursor: pointer;
+          touch-action: none;
+          user-select: none;
+          -webkit-user-select: none;
+          transition:
+            transform 0.12s ease-out,
+            box-shadow 0.28s ease-out,
+            background 0.28s ease-out;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          outline: none;
+        }
+
+        /* inner highlight */
         #recordBtn::before {
           content: "";
-          width: 18px;
-          height: 18px;
+          position: absolute;
+          top: 14%;
+          left: 22%;
+          width: 40%;
+          height: 26%;
           border-radius: 50%;
-          background: var(--accent);
-          transition: width 0.2s, height 0.2s, border-radius 0.2s, background 0.2s;
+          background: radial-gradient(
+            ellipse at center,
+            rgba(255, 255, 255, 0.9) 0%,
+            rgba(255, 255, 255, 0) 70%
+          );
+          pointer-events: none;
+        }
+
+        /* the small icon glyph inside */
+        #recordBtn::after {
+          content: "";
+          width: 20px;
+          height: 20px;
+          border-radius: 50%;
+          background: var(--text);
+          opacity: 0.75;
+          transition: width 0.2s, height 0.2s, border-radius 0.2s, background 0.2s, opacity 0.2s;
+          box-shadow: 0 1px 2px rgba(0,0,0,0.15);
         }
 
         #recordBtn:hover:not(:disabled) {
-          border-color: var(--text-muted);
+          box-shadow:
+            0 12px 28px rgba(60, 60, 80, 0.13),
+            0 2px 6px rgba(60, 60, 80, 0.08),
+            inset 0 -6px 14px rgba(120, 120, 140, 0.18),
+            inset 0 6px 10px rgba(255, 255, 255, 0.95),
+            0 0 18px 2px var(--glow-idle);
         }
+
+        /* pressed feedback */
+        #recordBtn.pressed,
         #recordBtn:active:not(:disabled) {
-          transform: scale(0.96);
+          transform: scale(0.94);
         }
+
         #recordBtn:disabled {
-          opacity: 0.35;
+          opacity: 0.45;
           cursor: not-allowed;
         }
 
-        /* recording state */
+        /* ---------- recording state ---------- */
+
         #recordBtn.recording {
-          border-color: var(--danger);
-        }
-        #recordBtn.recording::before {
-          width: 16px;
-          height: 16px;
-          border-radius: 3px;      /* square = stop */
-          background: var(--danger);
+          background: radial-gradient(
+            circle at 32% 28%,
+            var(--bubble-rec-hi) 0%,
+            #ffe3e3 45%,
+            var(--bubble-rec-lo) 100%
+          );
+          box-shadow:
+            0 14px 30px rgba(200, 60, 60, 0.18),
+            0 2px 6px rgba(200, 60, 60, 0.10),
+            inset 0 -6px 14px rgba(200, 80, 80, 0.22),
+            inset 0 6px 10px rgba(255, 255, 255, 0.95),
+            0 0 28px 4px var(--glow-rec),
+            0 0 60px 10px rgba(232, 92, 92, 0.25);
+          animation: breathe 1.8s ease-in-out infinite;
         }
 
-        /* subtle pulse ring while recording */
         #recordBtn.recording::after {
-          content: "";
-          position: absolute;
-          inset: -6px;
-          border-radius: 50%;
-          border: 1px solid var(--danger);
-          opacity: 0.4;
-          animation: pulse 1.6s infinite;
-          pointer-events: none;
+          width: 22px;
+          height: 22px;
+          border-radius: 4px;               /* square = stop */
+          background: var(--danger);
+          opacity: 1;
         }
-        @keyframes pulse {
-          0%   { transform: scale(0.9); opacity: 0.4; }
-          70%  { transform: scale(1.15); opacity: 0; }
-          100% { transform: scale(0.9); opacity: 0; }
+
+        @keyframes breathe {
+          0%, 100% {
+            box-shadow:
+              0 14px 30px rgba(200, 60, 60, 0.18),
+              0 2px 6px rgba(200, 60, 60, 0.10),
+              inset 0 -6px 14px rgba(200, 80, 80, 0.22),
+              inset 0 6px 10px rgba(255, 255, 255, 0.95),
+              0 0 24px 3px rgba(232, 92, 92, 0.45),
+              0 0 50px 8px rgba(232, 92, 92, 0.18);
+          }
+          50% {
+            box-shadow:
+              0 14px 30px rgba(200, 60, 60, 0.22),
+              0 2px 6px rgba(200, 60, 60, 0.12),
+              inset 0 -6px 14px rgba(200, 80, 80, 0.26),
+              inset 0 6px 10px rgba(255, 255, 255, 0.95),
+              0 0 36px 6px rgba(232, 92, 92, 0.65),
+              0 0 70px 14px rgba(232, 92, 92, 0.28);
+          }
+        }
+
+        /* processing state — non-interactive, soft grey */
+        #recordBtn.processing {
+          background: radial-gradient(
+            circle at 32% 28%,
+            #ffffff 0%,
+            #eeeeee 45%,
+            #d0d0d6 100%
+          );
+          box-shadow:
+            0 8px 20px rgba(60, 60, 80, 0.10),
+            0 2px 6px rgba(60, 60, 80, 0.06),
+            inset 0 -4px 10px rgba(120, 120, 140, 0.15),
+            inset 0 4px 8px rgba(255, 255, 255, 0.9);
+          animation: spin 1.6s linear infinite;
+        }
+        @keyframes spin {
+          0%   { transform: scale(0.96); }
+          50%  { transform: scale(1.0); }
+          100% { transform: scale(0.96); }
+        }
+        #recordBtn.processing::after {
+          width: 18px;
+          height: 18px;
+          border-radius: 50%;
+          background: var(--text-dim);
+          opacity: 0.8;
         }
 
         .timer {
           position: absolute;
-          top: -22px;
+          top: -26px;
           left: 50%;
           transform: translateX(-50%);
           font-size: 11px;
           color: var(--danger);
           font-variant-numeric: tabular-nums;
-          letter-spacing: 0.05em;
+          letter-spacing: 0.08em;
           white-space: nowrap;
+          font-weight: 600;
         }
 
         /* scrollbar */
@@ -398,9 +546,14 @@
     <div id="messages"></div>
 
     <footer>
-        <div id="status">Tap to speak</div>
+        <div id="status">Hold to speak</div>
         <div class="btn-wrap">
-            <button id="recordBtn" title="Start recording">🎙</button>
+            <div class="osc" id="osc" aria-hidden="true">
+                <div class="ring"></div>
+                <div class="ring"></div>
+                <div class="ring"></div>
+            </div>
+            <button id="recordBtn" title="Hold to record" aria-label="Hold to record"></button>
             <div class="timer" id="timer" style="display:none;">0:00</div>
         </div>
     </footer>
@@ -418,7 +571,10 @@
       /* ---------- storage keys ---------- */
       const KEY_ACCESS_TOKEN = "va_accessToken";
       const KEY_TOKEN_TYPE   = "va_tokenType";
-      const KEY_EXPIRES_AT   = "va_expiresAt";   // epoch ms
+      const KEY_EXPIRES_AT   = "va_expiresAt";
+
+      /* ---------- interaction constants ---------- */
+      const MIN_HOLD_MS = 350;   // ignore accidental taps shorter than this
 
       /* ---------- DOM ---------- */
       const loginScreen = document.getElementById("loginScreen");
@@ -437,19 +593,19 @@
       const statusEl   = document.getElementById("status");
       const recordBtn  = document.getElementById("recordBtn");
       const timerEl    = document.getElementById("timer");
+      const oscEl      = document.getElementById("osc");
 
       /* ============================================================
          AUTH STATE
          ============================================================ */
 
-      let authMode = "login"; // "login" | "register"
+      let authMode = "login";
 
       function saveAuth(accessToken, tokenType, expiresIn) {
         localStorage.setItem(KEY_ACCESS_TOKEN, accessToken);
         localStorage.setItem(KEY_TOKEN_TYPE, tokenType || "Bearer");
         if (typeof expiresIn === "number" && expiresIn > 0) {
-          const expiryMs = Date.now() + expiresIn * 1000;
-          localStorage.setItem(KEY_EXPIRES_AT, String(expiryMs));
+          localStorage.setItem(KEY_EXPIRES_AT, String(Date.now() + expiresIn * 1000));
         } else {
           localStorage.removeItem(KEY_EXPIRES_AT);
         }
@@ -461,9 +617,7 @@
         localStorage.removeItem(KEY_EXPIRES_AT);
       }
 
-      function getAccessToken() {
-        return localStorage.getItem(KEY_ACCESS_TOKEN);
-      }
+      function getAccessToken() { return localStorage.getItem(KEY_ACCESS_TOKEN); }
 
       function isTokenValid() {
         const token = getAccessToken();
@@ -547,7 +701,6 @@
             body: JSON.stringify({ email, password })
           });
 
-          /* -------- login flow -------- */
           if (authMode === "login") {
             if (!res.ok) {
               setAuthMessage(
@@ -570,7 +723,6 @@
             return;
           }
 
-          /* -------- register flow -------- */
           if (!res.ok) {
             let msg = `Registration failed (${res.status})`;
             try {
@@ -578,7 +730,7 @@
               if (errBody && (errBody.message || errBody.error)) {
                 msg = errBody.message || errBody.error;
               }
-            } catch (_) { /* not json */ }
+            } catch (_) { /* ignore */ }
             setAuthMessage(msg, "error");
             return;
           }
@@ -619,7 +771,7 @@
       function enterChat() {
         showChat();
         messagesEl.innerHTML = "";
-        addMessage("Hi. Tap the mic and ask me anything.", "system");
+        addMessage("Hi. Hold the bubble and ask me anything.", "system");
       }
 
       /* ============================================================
@@ -659,6 +811,9 @@
       let timerInterval = null;
       let secondsElapsed = 0;
       let isBusy = false;
+      let isRecording = false;
+      let recordStartTs = 0;
+      let pendingStop = false;   // set when user releases before MIN_HOLD_MS
 
       function startTimer() {
         secondsElapsed = 0;
@@ -671,6 +826,7 @@
           timerEl.textContent = `${m}:${s}`;
         }, 1000);
       }
+
       function stopTimer() {
         clearInterval(timerInterval);
         timerInterval = null;
@@ -699,7 +855,7 @@
       }
 
       async function startRecording() {
-        if (isBusy) return;
+        if (isBusy || isRecording) return;
 
         if (!navigator.mediaDevices || !window.MediaRecorder) {
           addMessage("Your browser does not support audio recording.", "error");
@@ -736,25 +892,47 @@
         });
 
         mediaRecorder.start();
+        isRecording = true;
+        recordStartTs = Date.now();
+
         recordBtn.classList.add("recording");
-        recordBtn.textContent = "■";
-        setStatus("Recording… tap to stop", "recording");
+        oscEl.classList.add("active");
+        setStatus("Recording… release to send", "recording");
         startTimer();
       }
 
       function stopRecording() {
         if (!mediaRecorder || mediaRecorder.state === "inactive") return;
+
+        // If the user released the button before MIN_HOLD_MS, mark this as a discard.
+        const held = Date.now() - recordStartTs;
+        pendingStop = held < MIN_HOLD_MS;
+
         mediaRecorder.stop();
         stopTimer();
+        isRecording = false;
+
         recordBtn.classList.remove("recording");
-        recordBtn.textContent = "🎙";
-        setStatus("Processing…", "processing");
-        isBusy = true;
-        recordBtn.disabled = true;
+        oscEl.classList.remove("active");
+        recordBtn.classList.add("processing");
+        setStatus(pendingStop ? "Hold longer to record" : "Processing…", "processing");
+
+        isBusy = !pendingStop;
+        if (!pendingStop) {
+          recordBtn.disabled = true;
+        }
       }
 
       async function onRecordingStopped() {
         cleanupStream();
+
+        // Discard too-short recordings
+        if (pendingStop) {
+          pendingStop = false;
+          recordedChunks = [];
+          resetUi();
+          return;
+        }
 
         if (recordedChunks.length === 0) {
           addMessage("No audio captured.", "error");
@@ -788,9 +966,7 @@
 
           const res = await fetch(VOICE_URL, {
             method: "POST",
-            headers: {
-              "Authorization": authHeader
-            },
+            headers: { "Authorization": authHeader },
             body: formData
           });
 
@@ -809,7 +985,7 @@
             try {
               const errBody = await res.json();
               if (errBody && errBody.message) detail = errBody.message;
-            } catch (_) { /* not json */ }
+            } catch (_) { /* ignore */ }
             addMessage(detail, "error");
             return;
           }
@@ -846,21 +1022,50 @@
 
       function resetUi() {
         isBusy = false;
+        isRecording = false;
+        pendingStop = false;
         recordBtn.disabled = false;
-        recordBtn.classList.remove("recording");
-        recordBtn.textContent = "🎙";
+        recordBtn.classList.remove("recording", "processing", "pressed");
+        oscEl.classList.remove("active");
         stopTimer();
-        setStatus("Tap to speak");
+        setStatus("Hold to speak");
       }
 
-      recordBtn.addEventListener("click", () => {
-        if (isBusy) return;
-        if (mediaRecorder && mediaRecorder.state === "recording") {
-          stopRecording();
-        } else {
-          startRecording();
-        }
-      });
+      /* ============================================================
+         PRESS-AND-HOLD INTERACTION
+         ============================================================ */
+
+      function onPointerDown(e) {
+        // Ignore right-click / middle-click — only primary button
+        if (e.button !== undefined && e.button !== 0) return;
+        if (isBusy || isRecording) return;
+
+        e.preventDefault();
+
+        recordBtn.classList.add("pressed");
+
+        // Start asynchronously; microphone permission may take a moment
+        startRecording();
+      }
+
+      function onPointerUp(e) {
+        recordBtn.classList.remove("pressed");
+
+        if (!isRecording) return;
+
+        // Release → stop → triggers upload
+        stopRecording();
+      }
+
+      recordBtn.addEventListener("pointerdown", onPointerDown);
+
+      // Stop on ANY pointerup/cancel, anywhere on the page.
+      // This handles the case where the user drags off the button while holding.
+      document.addEventListener("pointerup", onPointerUp);
+      document.addEventListener("pointercancel", onPointerUp);
+
+      // Prevent iOS long-press selection / context menu on the button
+      recordBtn.addEventListener("contextmenu", (e) => e.preventDefault());
 
       /* ============================================================
          INITIAL ROUTE
