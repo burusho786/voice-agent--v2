@@ -33,6 +33,9 @@ deepgram:
   smart-format: true
   tts:
     model: aura-2-thalia-en
+    speed: 1.1
+    encoding: mp3
+    bitrate: 24000
 
 audio:
   max-file-size: 15MB
