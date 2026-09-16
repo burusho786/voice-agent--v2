@@ -49,6 +49,10 @@ audio:
 ollama:
   base-url: http://localhost:11434
   model: gemma3:4b
+  keep-alive: 30m
+  num-predict: 200
+  connect-timeout: 5s
+  read-timeout: 120s
   embedding:
     base-url: http://localhost:11434
     model: nomic-embed-text
