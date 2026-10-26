@@ -723,7 +723,7 @@ This project is licensed under the MIT License — see the `LICENSE` file for de
 **Sohail Ahmad**
 
 - GitHub: [@sohailahmad](https://github.com/sohailahmad)
-- *Add your LinkedIn / email / portfolio link here*
+
 
 ---
 
