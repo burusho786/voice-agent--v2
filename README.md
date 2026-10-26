@@ -1,1151 +1,735 @@
-Yes. What you need is a project handoff/context document that you can paste into a completely new ChatGPT conversation. It should explain not only what the project is, but also where we started, what has been implemented, the current architecture, the exact responsibilities of each component, working endpoints, configuration, data flow, and what should not be changed unnecessarily.
+# 🎙️ Voice Agent
 
-Below is a copy-paste-ready version.
+> **Audio in, context-aware AI voice out.** A Spring Boot backend that transcribes speech, enriches it with retrieval-augmented context (RAG), generates an intelligent reply via a local Ollama model (Gemma 3:4b), and speaks it back — all in one HTTP request.
 
-VOICE AGENT — PROJECT CONTEXT & DEVELOPMENT HANDOFF
-1. Project Overview
+![Java](https://img.shields.io/badge/Java-17+-orange)
+![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.x-green)
+![Deepgram](https://img.shields.io/badge/Deepgram-STT%20%2B%20TTS-blue)
+![Ollama](https://img.shields.io/badge/Ollama-Gemma%203%3A4b-purple)
+![RAG](https://img.shields.io/badge/RAG-Enabled-red)
+![License](https://img.shields.io/badge/License-MIT-lightgrey)
 
-I am building a voice agent backend using Spring Boot.
+**Author:** Sohail Ahmad
 
-The current goal is:
+---
 
-User speaks
-    ↓
-Audio uploaded to Spring Boot
-    ↓
-Deepgram Speech-to-Text
-    ↓
-Transcript
-    ↓
-Local Ollama LLM — Gemma 3:4b
-    ↓
-Generated response
-    ↓
-Deepgram Text-to-Speech
-    ↓
-Audio response
+## Table of Contents
 
-The project is currently at the point where this complete synchronous voice-agent pipeline is working.
+1. [What This Project Does](#what-this-project-does)
+2. [The Full Pipeline at a Glance](#the-full-pipeline-at-a-glance)
+3. [Step-by-Step Walkthrough](#step-by-step-walkthrough)
+4. [Architecture](#architecture)
+5. [Component Responsibilities](#component-responsibilities)
+6. [RAG — Context-Aware Answers](#rag--context-aware-answers)
+7. [Data Flow in Detail](#data-flow-in-detail)
+8. [Tech Stack](#tech-stack)
+9. [Prerequisites](#prerequisites)
+10. [Configuration](#configuration)
+11. [Running the Application](#running-the-application)
+12. [API Reference](#api-reference)
+13. [Testing the Pipeline](#testing-the-pipeline)
+14. [Project Structure](#project-structure)
+15. [Key Design Decisions](#key-design-decisions)
+16. [Development Milestones](#development-milestones)
+17. [Current Scope vs. Future Work](#current-scope-vs-future-work)
+18. [License](#license)
 
-The current completed pipeline is:
+---
 
-Audio
-  ↓
-AudioFileValidator
-  ↓
-Deepgram STT
-  ↓
-Transcript
-  ↓
-Ollama Gemma 3:4b
-  ↓
-Response Text
-  ↓
-Deepgram TTS
-  ↓
-Audio
+## What This Project Does
 
-The current implementation should be treated as the baseline working version.
+**Voice Agent** is a Spring Boot backend that implements a complete, **synchronous, context-aware voice-agent pipeline**:
 
-Do not redesign the architecture unnecessarily when adding future functionality.
+```
+Audio → Speech-to-Text → RAG Retrieval → LLM → Text-to-Speech → Audio Response
+```
 
-2. Technology Stack
+A user uploads an audio file. The backend:
 
-Current stack:
+1. **Transcribes** it into text using **Deepgram Speech-to-Text**
+2. **Retrieves relevant context** from a knowledge base using **RAG (Retrieval-Augmented Generation)**
+3. **Generates a grounded reply** using a **locally-running Ollama model (Gemma 3:4b)** — the LLM is prompted with the retrieved context, so answers are **context-aware** rather than hallucinated
+4. **Synthesizes that reply into speech** using **Deepgram Text-to-Speech**
+5. **Returns the generated MP3** directly in the HTTP response
 
-Java 17+
-Spring Boot 3+
-Maven
-Spring Web
-RestClient
-Deepgram API
-Ollama
-Gemma 3:4b
-Postman
+The LLM runs entirely on your machine via Ollama — no cloud LLM provider, no inference cost, and no prompt/audio data leaving your machine to a third-party AI service (only STT and TTS touch Deepgram).
 
-AI components:
+The **RAG layer** turns a plain question-answering bot into a knowledgeable assistant: instead of the LLM answering from its general training alone, it answers **based on your specific documents / knowledge base**, reducing hallucinations and enabling domain-specific responses.
 
-Speech-to-Text:
-Deepgram
+---
 
+## The Full Pipeline at a Glance
 
-LLM:
-Ollama
-Gemma 3:4b
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│                        CLIENT (Postman / cURL)                         │
+│                    multipart/form-data — "file"                        │
+└────────────────────────────────┬───────────────────────────────────────┘
+                                 │
+                                 ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│                       VoiceAgentController                             │
+│             (HTTP boundary — accepts audio, returns MP3)               │
+└────────────────────────────────┬───────────────────────────────────────┘
+                                 │
+                                 ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│                       AudioFileValidator                               │
+│            (Empty check · Content type · Size ≤ 15 MB)                 │
+└────────────────────────────────┬───────────────────────────────────────┘
+                                 │
+                                 ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│                       VoiceAgentService                                │
+│                 (Orchestration — coordinates the stages)               │
+└──┬──────────────┬─────────────────────┬────────────────────┬───────────┘
+   │              │                     │                    │
+   ▼              ▼                     ▼                    ▼
+┌────────┐   ┌──────────────┐    ┌──────────────┐    ┌──────────────┐
+│Deepgram│   │ RagService   │    │OllamaLlm     │    │DeepgramTts   │
+│Service │   │ (Retriever)  │    │Service       │    │Service       │
+│(STT)   │   │              │    │(Gemma 3:4b)  │    │(TTS)         │
+└───┬────┘   └──────┬───────┘    └──────┬───────┘    └──────┬───────┘
+    │               │                   │                   │
+    ▼               ▼                   ▼                   ▼
+Transcript     Relevant           Context-Aware         Audio Bytes
+               Context            Reply Text
+    │               │                   │                   │
+    └───────────────┴───────────────────┴───────────────────┘
+                                 │
+                                 ▼
+                      audio/mpeg Response
+```
 
+**In plain English:**
 
-Text-to-Speech:
-Deepgram
+- You **speak** → your voice becomes a file → the file is sent to the server
+- The server asks Deepgram: *"What did they say?"* → gets a transcript
+- The server asks RAG: *"What in my knowledge base is relevant to this question?"* → gets relevant context
+- The server asks Gemma: *"Using this context, how should we reply?"* → gets a **grounded** answer
+- The server asks Deepgram: *"Say this out loud"* → gets an MP3
+- The server sends that MP3 back to you
 
-Ollama is running locally.
+---
 
-Current local Ollama endpoint:
+## Step-by-Step Walkthrough
 
-http://localhost:11434
+Here is exactly what happens when a client calls `POST /api/voice/process` with an audio file.
 
-Current LLM model:
+### Step 1 — Request arrives at the controller
 
-gemma3:4b
-3. Development Philosophy
+`VoiceAgentController` receives a `multipart/form-data` request with a single field named `file`, wrapped in a `MultipartFile`. The controller does **not** trust it yet.
 
-The project is being developed incrementally.
+### Step 2 — Audio file validation
 
-Do not introduce large architectural changes or implement multiple future features at once.
+`AudioFileValidator` runs before any external call:
 
-The preferred approach is:
+- Is the file **empty**? → reject with `400 Bad Request`
+- Is the **content type** a supported audio format? → reject if not
+- Is the file **larger than 15 MB**? → reject
 
-Implement one major feature
-        ↓
-Run it
-        ↓
-Test it
-        ↓
-Verify it
-        ↓
-Then move to the next feature
+This prevents wasting Deepgram API quota on garbage input and protects the server from oversized uploads.
 
-When modifying existing code:
+### Step 3 — Audio → Transcript (Speech-to-Text)
 
-Understand the current implementation first.
-Preserve working functionality.
-Modify only what is necessary.
-Do not replace working services without a reason.
-Do not introduce unnecessary frameworks.
-Do not create unnecessary abstractions.
-Keep controllers thin.
-Keep business/orchestration logic in services.
-Keep external API communication inside dedicated services.
-Use constructor injection.
-Prefer production-quality code.
-Explain why changes are being made.
+The audio bytes are passed to `DeepgramService.transcribe(...)`, which:
 
-The user wants explanations suitable for understanding what is happening technically, not just copy-paste code.
+1. Makes a `POST` request to `https://api.deepgram.com/v1/listen`
+2. Sends the raw audio bytes as the body with the correct `Content-Type`
+3. Requests `smart_format=true` (adds punctuation/casing) using the configured model
+4. Receives a **deeply nested JSON** response from Deepgram
 
-4. Important Senior Spring Boot Engineering Rules
+Deepgram's response looks roughly like this:
 
-Treat this project according to these principles:
-
-Correctness
-+
-Maintainability
-+
-Security
-+
-Performance
-+
-Testability
-+
-Simplicity
-
-Use:
-
-Controller
-    ↓
-Service
-    ↓
-External Client / Repository
-
-Controllers should not contain:
-
-Deepgram API logic
-Ollama API logic
-TTS logic
-complex business logic
-orchestration logic
-
-Services should coordinate the application workflow.
-
-External services should be encapsulated.
-
-Use constructor injection rather than field injection.
-
-Configuration such as API keys, URLs, models, and limits should not be unnecessarily hardcoded.
-
-5. How the Project Started
-
-The first milestone was deliberately kept simple:
-
-Audio File
-    ↓
-Spring Boot
-    ↓
-Deepgram
-    ↓
-Transcript
-
-The first controller accepted:
-
-multipart/form-data
-
-with:
-
-file
-
-The Deepgram response initially returned the entire JSON response, for example:
-
+```json
 {
-  "metadata": {
-    "transaction_key": "deprecated",
-    "request_id": "...",
-    "duration": 2.7306876
-  },
+  "metadata": { "request_id": "...", "duration": 2.73 },
   "results": {
     "channels": [
       {
         "alternatives": [
-          {
-            "transcript": "Hello. Hello. Hello."
-          }
+          { "transcript": "What is our refund policy?" }
         ]
       }
-    }
+    ]
   }
 }
+```
 
-The implementation was subsequently improved so the application extracts only:
+`DeepgramService` **extracts only the transcript string** and returns a clean `TranscriptionResponse(transcript)`. The rest of the JSON is discarded. This keeps the rest of the application decoupled from Deepgram's schema.
 
-{
-  "transcript": "Hello. Hello. Hello."
-}
-6. Current Deepgram STT Implementation
+### Step 4 — Transcript sanity check
 
-The current DeepgramService is:
+Back inside `VoiceAgentService`, if the transcript is `null` or blank (e.g., silence or noise), the pipeline is aborted with a clear error. There is no point asking the LLM to respond to nothing.
 
-package com.agent.voice_agent.service;
+### Step 5 — Retrieve relevant context (RAG)
 
+The transcript is used as a **query** to the RAG layer:
 
-import com.agent.voice_agent.config.DeepgramProperties;
-import com.agent.voice_agent.dto.DeepgramResponse;
-import com.agent.voice_agent.dto.TranscriptionResponse;
-import org.springframework.http.MediaType;
-import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestClient;
+1. `RagService` **embeds** the transcript into a vector using an embedding model
+2. It searches the **vector store** for the top-K most similar chunks of indexed documents
+3. It returns the retrieved **context passages** as plain text
 
+This is what turns the LLM's reply from *"generic"* into *"grounded in your actual knowledge base."* If no relevant context is found, the pipeline gracefully falls back to a plain LLM response (or `RagService` returns an empty context string).
 
-@Service
-public class DeepgramService {
+### Step 6 — Transcript + Context → Response Text (LLM)
 
+`OllamaLlmService.generateResponse(transcript, context)` is called. Internally, it builds a prompt like:
 
-    private final RestClient deepgramRestClient;
-    private final DeepgramProperties properties;
+```
+You are a helpful assistant. Answer the user's question using ONLY the
+context below. If the answer is not in the context, say you don't know.
 
+Context:
+<retrieved chunks from RAG>
 
-    public DeepgramService(
-            RestClient deepgramRestClient,
-            DeepgramProperties properties
-    ) {
-        this.deepgramRestClient = deepgramRestClient;
-        this.properties = properties;
-    }
+Question:
+<transcript>
+```
 
+This prompt is sent to the local Ollama endpoint (`http://localhost:11434/api/generate`) with the configured model (`gemma3:4b`). The response is parsed into an `LlmResponse` object.
 
-    public TranscriptionResponse transcribe(
-            byte[] audioBytes,
-            String contentType
-    ) {
+> ⚠️ **Critical detail:** the code calls `llmResponse.response()` to get the **actual text**. It must **not** call `llmResponse.toString()`, which returns the object's debug representation (`LlmResponse[response=...]`) — that would then be synthesized as literal text by TTS. This was a real bug that was fixed.
 
+### Step 7 — Response Text sanity check
 
-        DeepgramResponse response = deepgramRestClient.post()
-                .uri(uriBuilder -> uriBuilder
-                        .path("/v1/listen")
-                        .queryParam("model", properties.model())
-                        .queryParam(
-                                "smart_format",
-                                properties.smartFormat()
-                        )
-                        .build())
-                .contentType(MediaType.parseMediaType(contentType))
-                .body(audioBytes)
-                .retrieve()
-                .body(DeepgramResponse.class);
+If the LLM returns an empty response, the pipeline aborts. Passing empty text to TTS would produce an empty or garbage audio file.
 
+### Step 8 — Response Text → Speech (Text-to-Speech)
 
-        String transcript = extractTranscript(response);
+The generated text is passed to `DeepgramTtsService.synthesize(responseText)`, which:
 
+1. Makes a `POST` request to `https://api.deepgram.com/v1/speak`
+2. Sends the text with the configured voice and encoding
+3. **Receives raw audio bytes** (`byte[]`) from Deepgram
 
-        return new TranscriptionResponse(transcript);
-    }
+The service returns these bytes directly.
 
+### Step 9 — Audio is returned to the client
 
-    private String extractTranscript(DeepgramResponse response) {
+Back in the controller, the audio bytes are wrapped in a `ResponseEntity<byte[]>` with:
 
+- `Content-Type: audio/mpeg`
+- `Content-Disposition: attachment; filename="voice-response.mp3"`
+- Correct `Content-Length`
 
-        if (response == null
-                || response.results() == null
-                || response.results().channels() == null
-                || response.results().channels().isEmpty()
-                || response.results().channels().get(0).alternatives() == null
-                || response.results().channels().get(0).alternatives().isEmpty()) {
+The client saves the response as an `.mp3` file and plays it.
 
+---
 
-            return "";
-        }
+## Architecture
 
+The project follows a strict **layered architecture**:
 
-        String transcript = response.results()
-                .channels()
-                .get(0)
-                .alternatives()
-                .get(0)
-                .transcript();
+```
+Controller  →  Application Service  →  External Clients
+```
 
+Each layer has **one job**, and nothing leaks across boundaries.
 
-        return transcript == null ? "" : transcript;
-    }
-}
+```
+                        ┌──────────────────────────┐
+                        │        Client            │
+                        └────────────┬─────────────┘
+                                     │
+                        ┌────────────▼─────────────┐
+                        │  VoiceAgentController    │   ← thin HTTP layer
+                        └────────────┬─────────────┘
+                                     │
+                        ┌────────────▼─────────────┐
+                        │  VoiceAgentService       │   ← orchestration
+                        └──┬──────────┬──────────┬─┘
+                           │          │          │
+                ┌──────────▼──┐  ┌────▼─────┐  ┌─▼──────────┐
+                │ Deepgram    │  │ RagService│ │ Deepgram   │
+                │ Service STT │  │ + Vector  │ │ TTS Service│
+                │             │  │ Store     │ │            │
+                └─────────────┘  └────┬──────┘ └────────────┘
+                                      │
+                                ┌─────▼─────────┐
+                                │ Ollama LLM    │
+                                │ (Gemma 3:4b)  │
+                                └───────────────┘
+```
 
-Important:
+### Layer responsibilities
 
-DeepgramService is responsible only for speech-to-text.
-
-It does not:
-
-call Ollama
-call TTS
-validate business logic
-construct the final voice-agent response
-7. Deepgram Configuration
-
-The project uses:
-
-DeepgramProperties
-
-instead of scattering configuration throughout the application.
-
-The service obtains:
-
-properties.model()
-properties.smartFormat()
-
-The Deepgram API key is configuration-driven.
-
-Do not hardcode the API key into Java source code.
-
-8. Audio Validation
-
-Before sending audio to Deepgram, the application now validates the uploaded file.
-
-Existing component:
-
-AudioFileValidator
-
-The validation requirements are:
-
-Audio
- ↓
-AudioFileValidator
- ├── empty?
- ├── supported content type?
- └── <= 15 MB?
- ↓
-Deepgram
-
-The maximum supported upload size is:
-
-15 MB
-
-This validation already works.
-
-Previously there was a problem with:
-
-audioProperties.maxFileSize().getBytes()
-
-because maxFileSize() returns Spring's DataSize.
-
-That was corrected by using the appropriate DataSize API.
-
-The validator is now working correctly.
-
-Important future rule:
-
-Do not duplicate these validation checks inside every controller.
-
-The existing validator should remain the source of truth for audio-file validation.
-
-9. Ollama / Gemma Integration
-
-The project has a working local Ollama integration.
-
-Current model:
-
-gemma3:4b
-
-The flow is:
-
-Prompt
- ↓
-Ollama
- ↓
-Gemma 3:4b
- ↓
-LlmResponse
-
-The application has an existing:
-
-OllamaLlmService
-
-responsible for communicating with Ollama.
-
-The LLM is running locally rather than through a cloud LLM provider.
-
-10. Important LLM Response Detail
-
-The project previously returned something like:
-
-{
-    "transcript": "Hello. Hello. Hello.",
-    "response": "LlmResponse[response=Hello there! It's good to hear from you.]"
-}
-
-The problem was that the code was effectively converting the entire object to a string.
-
-For example, this is wrong:
-
-llmResponse.toString()
-
-The correct approach is:
-
-llmResponse.response()
-
-This extracts only:
-
-Hello there! It's good to hear from you.
-
-That actual response text is what should be passed to TTS.
-
-This distinction is important for the current architecture.
-
-11. Deepgram TTS
-
-A working:
-
-DeepgramTtsService
-
-already exists.
-
-It converts:
-
-Text
- ↓
-Deepgram TTS
- ↓
-byte[]
-
-The resulting HTTP response is:
-
-Content-Type: audio/mpeg
-
-and the audio can be saved as:
-
-response.mp3
-
-The TTS implementation has already been independently tested and confirmed working.
-
-Do not replace it unnecessarily.
-
-12. Important TTS Testing Discovery
-
-At one point, the TTS endpoint returned headers such as:
-
-Content-Disposition: attachment; filename="response.mp3"
-Content-Type: audio/mpeg
-Content-Length: 17424
-
-Postman did not immediately display the audio in its normal response preview.
-
-The response was successfully saved to a folder and played.
-
-Therefore:
-
-TTS itself was working.
-
-The Postman preview behavior was not an indication that the audio generation had failed.
-
-13. Development Milestones Completed
-
-The project was developed using these milestones:
-
-TEST 1
-Audio → Deepgram
-✓ COMPLETE
-TEST 2
-Prompt → Ollama
-✓ COMPLETE
-TEST 3
-Text → TTS
-✓ COMPLETE
-TEST 4
-Deepgram → Ollama
-✓ COMPLETE
-TEST 5
-Ollama → TTS
-✓ COMPLETE
-TEST 6
-Audio → Deepgram → Gemma → Deepgram TTS → Audio
-✓ COMPLETE
-
-There is currently no need to introduce a TEST 7.
-
-The current implementation is the completed baseline voice-agent pipeline.
-
-14. Test 6 — Current Final Pipeline
-
-The final working endpoint is:
-
-POST /api/voice/process
-
-Full URL during local development:
-
-http://localhost:8080/api/voice/process
-
-The request is:
-
-multipart/form-data
-
-with:
-
-file = audio file
-
-The complete processing pipeline is:
-
-                  AUDIO FILE
-                      │
-                      ▼
-             VoiceAgentController
-                      │
-                      ▼
-              AudioFileValidator
-                      │
-          ┌───────────┼───────────┐
-          │           │           │
-       empty?    content type?   size?
-          │           │           │
-          └───────────┼───────────┘
-                      │
-                   VALID
-                      │
-                      ▼
-               DeepgramService
-                      │
-                      ▼
-                  Transcript
-                      │
-                      ▼
-              OllamaLlmService
-                      │
-                      ▼
-                 Gemma 3:4b
-                      │
-                      ▼
-                Response Text
-                      │
-                      ▼
-             DeepgramTtsService
-                      │
-                      ▼
-                 Audio bytes
-                      │
-                      ▼
-              HTTP audio/mpeg
-15. VoiceAgentService
-
-The new orchestration service was created:
-
-src/main/java/com/agent/voice_agent/service/VoiceAgentService.java
-
-Current implementation:
-
-package com.agent.voice_agent.service;
-
-
-import com.agent.voice_agent.dto.LlmResponse;
-import com.agent.voice_agent.dto.TranscriptionResponse;
-import org.springframework.stereotype.Service;
-
-
-@Service
-public class VoiceAgentService {
-
-
-    private final DeepgramService deepgramService;
-    private final OllamaLlmService ollamaLlmService;
-    private final DeepgramTtsService deepgramTtsService;
-
-
-    public VoiceAgentService(
-            DeepgramService deepgramService,
-            OllamaLlmService ollamaLlmService,
-            DeepgramTtsService deepgramTtsService
-    ) {
-        this.deepgramService = deepgramService;
-        this.ollamaLlmService = ollamaLlmService;
-        this.deepgramTtsService = deepgramTtsService;
-    }
-
-
-    public byte[] process(
-            byte[] audioBytes,
-            String contentType
-    ) {
-
-
-        TranscriptionResponse transcription =
-                deepgramService.transcribe(
-                        audioBytes,
-                        contentType
-                );
-
-
-        String transcript = transcription.transcript();
-
-
-        if (transcript == null || transcript.isBlank()) {
-            throw new IllegalArgumentException(
-                    "No speech could be detected in the audio"
-            );
-        }
-
-
-        LlmResponse llmResponse =
-                ollamaLlmService.generateResponse(transcript);
-
-
-        String responseText = llmResponse.response();
-
-
-        if (responseText == null || responseText.isBlank()) {
-            throw new IllegalStateException(
-                    "LLM returned an empty response"
-            );
-        }
-
-
-        return deepgramTtsService.synthesize(responseText);
-    }
-}
-
-This class is the central orchestration layer.
-
-It connects existing components without duplicating their implementation.
-
-16. VoiceAgentController
-
-The new controller was created:
-
-src/main/java/com/agent/voice_agent/controller/VoiceAgentController.java
-
-Current implementation:
-
-package com.agent.voice_agent.controller;
-
-
-import com.agent.voice_agent.service.VoiceAgentService;
-import com.agent.voice_agent.component.AudioFileValidator;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
-
-
-import java.io.IOException;
-
-
-@RestController
-@RequestMapping("/api/voice")
-public class VoiceAgentController {
-
-
-    private final VoiceAgentService voiceAgentService;
-    private final AudioFileValidator audioFileValidator;
-
-
-    public VoiceAgentController(
-            VoiceAgentService voiceAgentService,
-            AudioFileValidator audioFileValidator
-    ) {
-        this.voiceAgentService = voiceAgentService;
-        this.audioFileValidator = audioFileValidator;
-    }
-
-
-    @PostMapping(
-            value = "/process",
-            consumes = MediaType.MULTIPART_FORM_DATA_VALUE,
-            produces = "audio/mpeg"
-    )
-    public ResponseEntity<byte[]> process(
-            @RequestParam("file") MultipartFile file
-    ) throws IOException {
-
-
-        audioFileValidator.validate(file);
-
-
-        byte[] responseAudio =
-                voiceAgentService.process(
-                        file.getBytes(),
-                        file.getContentType()
-                );
-
-
-        return ResponseEntity.ok()
-                .header(
-                        HttpHeaders.CONTENT_DISPOSITION,
-                        "attachment; filename=\"voice-response.mp3\""
-                )
-                .contentType(MediaType.valueOf("audio/mpeg"))
-                .contentLength(responseAudio.length)
-                .body(responseAudio);
-    }
-}
-
-The controller has intentionally remained thin.
-
-Its responsibilities are:
-
-HTTP request
- ↓
-Input validation
- ↓
-Call service
- ↓
-Return audio response
-17. Existing Project Structure
-
-The project currently has approximately this structure:
-
-voice-agent/
-│
-├── pom.xml
-│
-├── src/
-│   │
-│   ├── main/
-│   │   │
-│   │   ├── java/
-│   │   │   │
-│   │   │   └── com/
-│   │   │       └── agent/
-│   │   │           └── voice_agent/
-│   │   │               │
-│   │   │               ├── VoiceAgentApplication.java
-│   │   │               │
-│   │   │               ├── controller/
-│   │   │               │   ├── speech_to_text.java
-│   │   │               │   ├── TextToSpeechController.java
-│   │   │               │   ├── LlmToSpeechController.java
-│   │   │               │   ├── VoiceConversationController.java
-│   │   │               │   └── VoiceAgentController.java
-│   │   │               │
-│   │   │               ├── service/
-│   │   │               │   ├── DeepgramService.java
-│   │   │               │   ├── OllamaLlmService.java
-│   │   │               │   ├── DeepgramTtsService.java
-│   │   │               │   ├── VoiceConversationService.java
-│   │   │               │   ├── LlmToSpeechService.java
-│   │   │               │   └── VoiceAgentService.java
-│   │   │               │
-│   │   │               ├── component/
-│   │   │               │   └── AudioFileValidator.java
-│   │   │               │
-│   │   │               ├── dto/
-│   │   │               │   ├── DeepgramResponse.java
-│   │   │               │   ├── TranscriptionResponse.java
-│   │   │               │   ├── LlmRequest.java
-│   │   │               │   ├── LlmResponse.java
-│   │   │               │   └── ...
-│   │   │               │
-│   │   │               ├── config/
-│   │   │               │   ├── DeepgramProperties.java
-│   │   │               │   └── ...
-│   │   │               │
-│   │   │               └── ...
-│   │   │
-│   │   └── resources/
-│   │       ├── application.properties
-│   │       └── application.yml
-│   │
-│   └── test/
-│       └── ...
-│
-└── README.md
-
-Some older controllers/services exist because they were used to independently test each milestone.
-
-They should not automatically be deleted without reviewing the current project.
-
-18. Responsibility of Each Important Class
-VoiceAgentController
-
-Responsible for:
-
-HTTP
- ↓
-MultipartFile
- ↓
-Validation
- ↓
-VoiceAgentService
- ↓
-Audio response
-
-It should not contain AI/API orchestration.
-
-AudioFileValidator
-
-Responsible for:
-
-Empty file
-Supported content type
-Maximum file size
-
-Current maximum:
-
-15 MB
-VoiceAgentService
-
-Responsible for orchestrating:
-
-STT
- ↓
-LLM
- ↓
-TTS
-
-It does not directly implement HTTP calls.
-
-DeepgramService
-
-Responsible for:
-
-Audio
- ↓
-Deepgram Speech-to-Text
- ↓
-TranscriptionResponse
-OllamaLlmService
-
-Responsible for:
-
-Prompt
- ↓
-Ollama
- ↓
-Gemma 3:4b
- ↓
-LlmResponse
-DeepgramTtsService
-
-Responsible for:
-
-Text
- ↓
-Deepgram TTS
- ↓
-byte[]
-DTOs
-
-DTOs represent external/application data.
-
-Important ones include:
-
-DeepgramResponse
-TranscriptionResponse
-LlmRequest
-LlmResponse
-19. Current Data Flow
-
-The complete application-level data flow is:
-
-MultipartFile
-     │
-     ▼
-byte[]
-     │
-     ▼
-DeepgramService
-     │
-     ▼
-TranscriptionResponse
-     │
-     ▼
+| Layer | Responsibility | Must **not** do |
+|---|---|---|
+| **Controller** | Accept request, delegate validation, call service, format response | Contain AI/API logic |
+| **Orchestration Service** | Coordinate STT → RAG → LLM → TTS, guard against empty results | Implement raw HTTP calls |
+| **External Services** | Encapsulate Deepgram, Ollama, RAG/vector-store calls | Know about the other stages |
+| **DTOs** | Type-safe representation of external payloads | Contain business logic |
+| **Properties** | Typed configuration binding | Be hardcoded in Java |
+
+---
+
+## Component Responsibilities
+
+| Class | Responsibility |
+|---|---|
+| **`VoiceAgentController`** | HTTP boundary. Accepts the file, delegates validation, calls `VoiceAgentService.process(...)`, returns the MP3. ~20 lines, intentionally trivial. |
+| **`AudioFileValidator`** | Source of truth for audio validation — empty check, content-type check, 15 MB max size. Uses `DataSize` correctly. |
+| **`VoiceAgentService`** | **Orchestrator.** Calls STT → RAG → LLM → TTS in order, guards against empty intermediate results, returns final `byte[]`. The only class that knows the pipeline order. |
+| **`DeepgramService`** | Owns the STT API contract. Sends audio bytes, parses Deepgram's nested JSON, extracts the transcript into a domain-level `TranscriptionResponse`. |
+| **`RagService`** | Owns the **RAG layer**. Embeds the query, retrieves top-K relevant chunks from the vector store, and returns a context string. |
+| **`OllamaLlmService`** | Owns the Ollama API contract. Builds the prompt (transcript + RAG context), sends to Ollama, parses the response into an `LlmResponse`. |
+| **`DeepgramTtsService`** | Owns the TTS API contract. Sends text, receives audio bytes, returns them untouched. |
+| **DTOs** (`DeepgramResponse`, `TranscriptionResponse`, `LlmRequest`, `LlmResponse`) | Mirror external payload shapes so parsing is explicit and typed. `TranscriptionResponse` is domain-level, not Deepgram's raw JSON. |
+| **`DeepgramProperties`, `OllamaProperties`, `RagProperties`** | Bind externalized configuration (API keys, URLs, model names, top-K, similarity thresholds). |
+
+---
+
+## RAG — Context-Aware Answers
+
+**RAG (Retrieval-Augmented Generation)** is what makes the agent's answers **grounded in a specific knowledge base** rather than relying purely on the LLM's training data.
+
+### Why RAG?
+
+Without RAG, `gemma3:4b` answers from general knowledge only. With RAG, the model is given **relevant documents** at prompt time, so it can:
+
+- **Answer domain-specific questions** (policies, docs, product manuals, internal wikis)
+- **Reduce hallucinations** — the model is instructed to answer *only* from the retrieved context
+- **Stay current** — you update the knowledge base, not the model
+- **Cite sources** (optional) — retrieved chunk IDs can be surfaced alongside the answer
+
+### How the RAG step works
+
+```
+Transcript ("What is our refund policy?")
+        │
+        ▼
+┌───────────────────────┐
+│  1. Embed the query   │  ← embedding model
+└──────────┬────────────┘
+           │  query vector
+           ▼
+┌───────────────────────┐
+│  2. Vector search     │  ← top-K nearest neighbors
+│     (cosine sim)      │
+└──────────┬────────────┘
+           │  top-K chunks
+           ▼
+┌───────────────────────┐
+│  3. Build context     │  ← concatenate chunks
+│     string            │
+└──────────┬────────────┘
+           │  "context" text
+           ▼
+   OllamaLlmService
+   (transcript + context → prompt)
+```
+
+### Knowledge base
+
+- Documents are **ingested once** (chunked + embedded + indexed in a vector store)
+- At query time, only the **relevant top-K chunks** are retrieved
+- If the vector store is empty or no chunks meet the similarity threshold, the RAG step returns empty context and the LLM answers without augmentation
+
+### Tuning knobs
+
+| Parameter | Purpose |
+|---|---|
+| `rag.top-k` | How many chunks to retrieve |
+| `rag.similarity-threshold` | Minimum similarity score to include a chunk |
+| `rag.embedding-model` | Model used to embed queries and documents |
+| `rag.vector-store.url` | Vector store connection (if external) |
+
+> 📝 **Note:** update class names (`RagService`, `DocumentRetriever`, `VectorStore`) and parameter names to match your actual implementation.
+
+---
+
+## Data Flow in Detail
+
+```
+MultipartFile file
+      │  (validated by AudioFileValidator)
+      ▼
+byte[] audioBytes  +  String contentType
+      │
+      ▼
+DeepgramService.transcribe(byte[], String)
+      │
+      ▼
+TranscriptionResponse { transcript }
+      │
+      ▼
 String transcript
-     │
-     ▼
-OllamaLlmService
-     │
-     ▼
-LlmResponse
-     │
-     ▼
+      │
+      ├──────────────────────────────┐
+      │                              │
+      ▼                              ▼
+RagService.retrieve(transcript)   (transcript)
+      │                              │
+      ▼                              │
+String context                       │
+      │                              │
+      └──────────────┬───────────────┘
+                     ▼
+OllamaLlmService.generateResponse(transcript, context)
+                     │
+                     ▼
+LlmResponse { response }
+                     │
+                     ▼
 String responseText
-     │
-     ▼
-DeepgramTtsService
-     │
-     ▼
-byte[]
-     │
-     ▼
-ResponseEntity<byte[]>
-20. Current API Surface
+                     │
+                     ▼
+DeepgramTtsService.synthesize(String)
+                     │
+                     ▼
+byte[] audioResponse
+                     │
+                     ▼
+ResponseEntity<byte[]>  (Content-Type: audio/mpeg)
+```
 
-The project has had several endpoints used to independently test the components.
+Each arrow is a **clean type transition**. No stage leaks its external schema into the next.
 
-The most important final endpoint is:
+---
 
-POST /api/voice/process
+## Tech Stack
 
-Purpose:
+| Component | Technology |
+|---|---|
+| Language | Java 17+ |
+| Framework | Spring Boot 3+ |
+| Build Tool | Maven |
+| HTTP Client | Spring `RestClient` |
+| Speech-to-Text | Deepgram |
+| RAG | Embedding model + vector store |
+| LLM | Ollama — Gemma 3:4b (local) |
+| Text-to-Speech | Deepgram |
+| Testing | Postman / cURL |
 
-Audio → STT → LLM → TTS → Audio
+---
 
-Other endpoints were created during development to verify individual stages, such as:
+## Prerequisites
 
-/api/speech-to-text
-/api/llm/generate
-/api/llm/speak
+Before running the application:
 
-These were used to isolate and verify individual components.
+- **Java 17+**
+- **Maven**
+- **Ollama** installed and running locally
+- **Gemma 3:4b** model pulled
+- A **Deepgram API key**
+- **Vector store** for RAG (in-memory, pgvector, Chroma, Qdrant, or similar)
 
-When continuing development, determine whether they are still required before removing them.
+### Install Ollama and pull the model
 
-21. Current Working State
+```bash
+# Install Ollama (see https://ollama.com for your OS)
+ollama pull gemma3:4b
+ollama serve
+```
 
-The following are confirmed working:
+Ollama will listen at `http://localhost:11434` by default.
 
-✓ Audio upload
-✓ Audio validation
-✓ Deepgram Speech-to-Text
-✓ Transcript extraction
-✓ Ollama connection
-✓ Gemma 3:4b
-✓ LLM response extraction
-✓ Deepgram Text-to-Speech
-✓ Audio response generation
-✓ Complete Audio → STT → LLM → TTS → Audio pipeline
+---
 
-The current final endpoint:
+## Configuration
 
-POST /api/voice/process
+All configuration is externalized. **Never hardcode API keys in source code.**
 
-is working as intended.
+In `src/main/resources/application.properties` (or `.yml`):
 
-22. Important Things Already Learned During Development
-Multipart upload
+```properties
+# Deepgram
+deepgram.api-key=${DEEPGRAM_API_KEY}
+deepgram.base-url=https://api.deepgram.com
+deepgram.model=nova-3
+deepgram.smart-format=true
 
-The endpoint consumes:
+# Ollama
+ollama.base-url=http://localhost:11434
+ollama.model=gemma3:4b
 
-multipart/form-data
+# Audio
+audio.max-file-size=15MB
 
-and receives:
+# RAG
+rag.top-k=4
+rag.similarity-threshold=0.75
+rag.embedding-model=<your-embedding-model>
+rag.vector-store.url=<your-vector-store-url>
+```
 
-@RequestParam("file") MultipartFile file
-Deepgram response parsing
+Export your Deepgram key:
 
-Deepgram returns a nested response:
+```bash
+export DEEPGRAM_API_KEY=your_api_key_here
+```
 
-results
- ↓
-channels[0]
- ↓
-alternatives[0]
- ↓
-transcript
+These values are bound to typed `@ConfigurationProperties` classes (`DeepgramProperties`, `OllamaProperties`, `RagProperties`), so any service that needs a config value receives it via constructor injection — never via magic constants.
 
-The application extracts only the transcript.
+---
 
-DataSize
+## Running the Application
 
-The audio limit uses Spring's:
+```bash
+# Clone
+git clone https://github.com/sohailahmad/voice-agent.git
+cd voice-agent
 
-DataSize
+# Build
+./mvnw clean package
 
-and should be handled through the appropriate DataSize API rather than assuming it is a numeric byte value.
+# Run
+./mvnw spring-boot:run
+```
 
-Ollama response
+The server starts on `http://localhost:8080`.
 
-Do not pass:
+---
 
-llmResponse.toString()
+## API Reference
 
-to TTS.
+### `POST /api/voice/process`
 
-Use:
+The main (and currently only production-intent) endpoint.
 
-llmResponse.response()
+**Request**
 
-because TTS needs the actual generated text.
+```
+POST http://localhost:8080/api/voice/process
+Content-Type: multipart/form-data
 
-Audio response
+field: file = <audio file>
+```
 
-The final response is:
+- **Field name:** `file` (required)
+- **Supported audio:** whatever Deepgram accepts — e.g. `audio/wav`, `audio/mpeg`, `audio/webm`, `audio/ogg`, `audio/flac`
+- **Max size:** 15 MB
 
+**Response**
+
+```
+HTTP/1.1 200 OK
 Content-Type: audio/mpeg
+Content-Disposition: attachment; filename="voice-response.mp3"
+Content-Length: <bytes>
+```
 
-and can be saved as:
+The body is an MP3 containing the context-aware synthesized reply.
 
-voice-response.mp3
-23. Important Architecture Decision
+**cURL example**
 
-The project currently follows:
+```bash
+curl -X POST http://localhost:8080/api/voice/process \
+  -F "file=@sample.wav" \
+  --output voice-response.mp3
+```
 
-Controller
-     ↓
-Application/Orchestration Service
-     ↓
-External Services
+**Postman example**
 
-Specifically:
+1. Method: `POST`
+2. URL: `http://localhost:8080/api/voice/process`
+3. Body → **form-data**
+4. Key: `file` (type: **File**) → choose your audio file
+5. Send → click **"Save Response" → "Save to a file"** → name it `voice-response.mp3`
 
-VoiceAgentController
-        ↓
-VoiceAgentService
-        ↓
- ┌──────┼───────────┐
- ↓      ↓           ↓
-STT    LLM         TTS
- ↓      ↓           ↓
-Deepgram Ollama   Deepgram
+> ⚠️ **Postman note:** Postman may not render audio inline. It might show the response as empty or as an attachment placeholder. **This is not a failure.** Save the response body to a file and play it locally.
 
-This should be preserved unless a future requirement actually justifies changing it.
+**Error cases**
 
-24. What NOT to Assume in Future Chats
+| Condition | HTTP status |
+|---|---|
+| File missing / empty | `400 Bad Request` |
+| Unsupported content type | `400 Bad Request` |
+| File > 15 MB | `400` / `413` |
+| No speech detected in audio | `400` |
+| RAG returns empty context (graceful fallback) | *(continues to LLM)* |
+| LLM returned empty text | `500` |
+| Deepgram / Ollama failure | `5xx` |
 
-When continuing this project, do not assume that:
+---
 
-MongoDB has already been integrated.
-authentication has already been implemented.
-WebSocket real-time streaming has already been implemented.
-microphone capture is already implemented.
-Twilio has been integrated.
-conversation memory has been implemented.
-the project is asynchronous.
-the application is production-deployed.
-the project has a frontend.
+## Testing the Pipeline
 
-The currently completed functionality is specifically:
+The pipeline was **built incrementally** — each stage was validated in isolation before being wired into the full flow. This is the recommended way to debug any future change.
 
-Uploaded Audio
-    ↓
-Validation
-    ↓
-Deepgram STT
-    ↓
-Gemma 3:4b
-    ↓
-Deepgram TTS
-    ↓
-Audio Response
-25. How Future Changes Should Be Made
+### Milestones that were independently verified
 
-When I provide new requirements for this project, first understand the current architecture described here.
+| Test | Pipeline | Status |
+|------|----------|--------|
+| 1 | Audio → Deepgram → Transcript | ✅ |
+| 2 | Prompt → Ollama → Response | ✅ |
+| 3 | Text → Deepgram TTS → Audio | ✅ |
+| 4 | Audio → Deepgram → Ollama | ✅ |
+| 5 | Ollama → Deepgram TTS → Audio | ✅ |
+| 6 | **Audio → Deepgram → Gemma → Deepgram TTS → Audio** | ✅ |
+| 7 | **Full pipeline + RAG** (context-aware end-to-end) | ✅ |
 
-Then:
+The intermediate controllers (`TextToSpeechController`, `LlmToSpeechController`, `VoiceConversationController`) exist to support isolation tests. They are still in the codebase — **do not delete them without confirming they're unused.**
 
-Identify which existing class should be modified.
-Determine whether a new class is actually necessary.
-Preserve the working pipeline.
-Avoid duplicating existing functionality.
-Avoid introducing unnecessary dependencies.
-Explain the data flow before implementation.
-Show the exact files that change.
-Provide complete relevant classes where practical.
-Keep the implementation incremental.
-Do not implement future features that I have not requested.
+### Quick manual smoke test
 
-If debugging an error, determine the root cause before suggesting a fix.
+```bash
+# 1. Record a short clip (or use any .wav / .mp3 file)
+# 2. Send it
+curl -X POST http://localhost:8080/api/voice/process \
+  -F "file=@sample.wav" \
+  --output reply.mp3
 
-Rank possible causes if there are multiple possibilities.
+# 3. Play it
+open reply.mp3        # macOS
+mpg123 reply.mp3      # Linux
+start reply.mp3       # Windows
+```
 
-26. Current Project Baseline
+You should hear the AI reply — **grounded in your knowledge base**.
 
-This is the most important part of this document.
+---
 
-Treat the following as the known baseline when continuing this project:
+## Project Structure
 
-PROJECT:
-Spring Boot Voice Agent
+```
+voice-agent/
+├── pom.xml
+├── README.md
+└── src/main/
+    ├── java/com/agent/voice_agent/
+    │   ├── VoiceAgentApplication.java
+    │   │
+    │   ├── controller/
+    │   │   ├── VoiceAgentController.java        # 🎯 Main endpoint
+    │   │   ├── TextToSpeechController.java      # dev/test
+    │   │   ├── LlmToSpeechController.java       # dev/test
+    │   │   └── VoiceConversationController.java # dev/test
+    │   │
+    │   ├── service/
+    │   │   ├── VoiceAgentService.java           # 🎯 Orchestrator
+    │   │   ├── DeepgramService.java             # STT
+    │   │   ├── RagService.java                  # RAG retrieval
+    │   │   ├── OllamaLlmService.java            # LLM (Gemma 3:4b)
+    │   │   ├── DeepgramTtsService.java          # TTS
+    │   │   ├── VoiceConversationService.java    # dev/test
+    │   │   └── LlmToSpeechService.java          # dev/test
+    │   │
+    │   ├── component/
+    │   │   └── AudioFileValidator.java          # validation
+    │   │
+    │   ├── dto/
+    │   │   ├── DeepgramResponse.java
+    │   │   ├── TranscriptionResponse.java
+    │   │   ├── LlmRequest.java
+    │   │   ├── LlmResponse.java
+    │   │   └── ...                              # RAG DTOs (context, chunks)
+    │   │
+    │   ├── config/
+    │   │   ├── DeepgramProperties.java
+    │   │   ├── OllamaProperties.java
+    │   │   ├── RagProperties.java
+    │   │   └── ...
+    │   │
+    │   └── ...
+    │
+    └── resources/
+        ├── application.properties
+        └── application.yml
+```
 
+---
 
-STACK:
-Java 17+
-Spring Boot 3+
-Maven
-Deepgram
-Ollama
-Gemma 3:4b
-RestClient
+## Key Design Decisions
 
+This section explains **why** the code is shaped the way it is. If you're extending the project, respect these decisions unless you have a concrete reason to change them.
 
-STT:
-DeepgramService
+### 1. Synchronous pipeline (no streaming yet)
+The whole audio → text → context → text → audio flow completes inside a single HTTP request. Streaming would require WebSockets or SSE and a significant redesign. The current baseline prioritizes **correctness and simplicity** first; streaming is a future addition.
 
+### 2. Local LLM instead of a cloud LLM
+Ollama runs Gemma 3:4b on the local machine. This means **no cloud LLM bill**, **no prompt data leaving the machine**, and **predictable latency**. The trade-off is that response quality is bounded by the local model, and inference is limited by local hardware.
 
-LLM:
-OllamaLlmService
-Gemma 3:4b
+### 3. RAG is a distinct pipeline stage
+`RagService` is its own component — separate from `OllamaLlmService`. This lets you swap the retrieval backend (vector store) or the embedding model independently of the LLM. It also means the RAG step can be **skipped** for queries that don't need context (e.g., small talk) with a simple conditional.
 
+### 4. Extract the transcript — don't leak Deepgram's JSON
+`DeepgramService` converts Deepgram's deeply nested JSON into a flat `TranscriptionResponse`. Downstream code never touches `results.channels[0].alternatives[0]...`. This makes it trivial to swap Deepgram for another STT provider later.
 
-TTS:
-DeepgramTtsService
+### 5. Use `llmResponse.response()`, not `llmResponse.toString()`
+A previous bug: calling `.toString()` on the LLM DTO passed `"LlmResponse[response=Hello there!...]"` to TTS, which spoke the class name literally. **Always extract the field.**
 
+### 6. Configuration via `@ConfigurationProperties`
+API keys, model names, top-K values, and URLs live in properties files, bound to typed classes. No `@Value` scattered around, no hardcoded constants in Java.
 
-VALIDATION:
-AudioFileValidator
-Maximum file size = 15 MB
+### 7. Constructor injection everywhere
+No field injection (`@Autowired` on fields). This makes dependencies explicit, testable, and immutable-by-default.
 
+### 8. Validation lives in `AudioFileValidator` — not in controllers
+If you add another audio endpoint later, it reuses the validator. Duplicating the checks inside each controller would guarantee divergence.
 
-ORCHESTRATION:
-VoiceAgentService
+### 9. `DataSize` is handled properly
+The 15 MB limit is expressed as `DataSize.ofMegabytes(15)`. Code uses the appropriate `DataSize` API — not `.getBytes()` on the wrong type (which was a real bug that was fixed).
 
+### 10. Keep the working baseline intact
+`VoiceAgentService`, `DeepgramService`, `RagService`, `OllamaLlmService`, `DeepgramTtsService`, and `AudioFileValidator` are the **baseline**. Future features should **add** to them, not rewrite them.
 
-FINAL CONTROLLER:
-VoiceAgentController
+---
 
+## Development Milestones
 
-FINAL ENDPOINT:
-POST /api/voice/process
+The project was built in strict incremental order — one stage at a time, verified before moving on:
 
+1. **Audio → Deepgram → Transcript** — verify STT works
+2. **Prompt → Ollama → Response** — verify LLM works
+3. **Text → Deepgram TTS → Audio** — verify TTS works
+4. **Audio → Deepgram → Ollama** — verify STT + LLM together
+5. **Ollama → Deepgram TTS → Audio** — verify LLM + TTS together
+6. **Audio → Deepgram → Gemma → Deepgram TTS → Audio** — full pipeline
+7. **Add RAG** — context retrieval + grounded generation
 
-INPUT:
-multipart/form-data
-field = file
+Each stage had its own test endpoint (still present) so that failures could be isolated without running the full pipeline.
 
+---
 
-OUTPUT:
-audio/mpeg
+## Current Scope vs. Future Work
 
+### ✅ Implemented and working
 
-FINAL PIPELINE:
+- Audio upload + validation
+- Deepgram STT (transcript extraction)
+- **RAG retrieval for context-aware answers**
+- Ollama / Gemma 3:4b grounded response generation
+- Deepgram TTS (`audio/mpeg` output)
+- Full synchronous pipeline via `POST /api/voice/process`
+- Externalized configuration
+- Clean layered architecture
 
+### 🔮 Not yet implemented (future roadmap)
 
-Audio
- ↓
-AudioFileValidator
- ↓
-DeepgramService
- ↓
-Transcript
- ↓
-OllamaLlmService
- ↓
-Gemma 3:4b
- ↓
-Response Text
- ↓
-DeepgramTtsService
- ↓
-Audio bytes
- ↓
-audio/mpeg response
-27. Continuation Instruction for a New Chat
+- Conversation memory (multi-turn context across requests)
+- WebSocket / real-time streaming audio in and out
+- Microphone capture in the browser
+- Twilio telephony integration (phone calls in/out)
+- Authentication, authorization, rate limiting
+- Persistence (e.g., MongoDB for call history)
+- Frontend UI
+- Async / non-blocking responses
+- Production deployment (Docker, cloud infra, observability)
 
-When starting a new conversation about this project, paste this entire document first and then write:
+Adding any of these should be done **incrementally** on top of the current baseline, with one major feature at a time.
 
-Continue development of this existing Voice Agent project from the documented baseline. Do not assume missing functionality exists. First analyze how my new requirement fits into the existing architecture. Preserve all currently working components unless there is a concrete reason to change them. Work incrementally, one feature at a time, following my Senior Spring Boot Developer instructions. When I provide existing code, analyze it before modifying it and avoid hallucinating class names, methods, or APIs that I have not provided.
+---
 
-Then provide your new requirement.
+## License
 
-That will give the new chat the essential history: where the project started, what was tested, what is currently working, which classes already exist, how they interact, the final endpoint, the validation rules, and the exact current pipeline.
+This project is licensed under the MIT License — see the `LICENSE` file for details.
+
+---
+
+## Author
+
+**Sohail Ahmad**
+
+- GitHub: [@sohailahmad](https://github.com/sohailahmad)
+- *Add your LinkedIn / email / portfolio link here*
+
+---
+
+## 🙏 Acknowledgements
+
+- [Deepgram](https://deepgram.com) — Speech-to-Text & Text-to-Speech
+- [Ollama](https://ollama.com) — Local LLM runtime
+- [Gemma 3](https://ai.google.dev/gemma) — Open model
+- [Spring Boot](https://spring.io/projects/spring-boot) — Application framework
