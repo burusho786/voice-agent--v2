@@ -11,11 +11,11 @@ spring:
 
   data:
     mongodb:
-      uri: mongodb+srv://burusho786_db_user:UhoGZ7CpuNEJ0hDj@cluster0.vdq7upj.mongodb.net/admin?voice-agent=Cluster0
+      uri: 
       auto-index-creation: true
 
   jwt:
-    secret: TaK+HaV^uvCHEFsEVfypW#7g9^k*Z8$V
+    secret: 
 
 server:
   port: 8080
@@ -27,7 +27,7 @@ server:
     key-alias: voiceagent
 
 deepgram:
-  api-key: de0ea318988a5fdfa7fbd9dd380cdea88ff9730f
+  api-key: 
   base-url: https://api.deepgram.com
   model: nova-3
   smart-format: true
